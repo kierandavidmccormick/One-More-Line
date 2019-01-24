@@ -6,14 +6,30 @@ Player player;
 World world;
 Random r;
 
+final int WORLD_LENGTH = 1000;
+final int WORLD_WIDTH = 500;
+final int INITIAL_PLAYER_ANGLE = 90;
+final int INITIAL_PLAYER_X = 250;
+final int INITIAL_PLAYER_Y = 50;
+final int LEFT_LINE_X = 200;
+final int RIGHT_LINE_X = 300;
+final int OBSTACLES_Y_START = 100;
+final int OBSTACLES_Y_END = WORLD_LENGTH;
+final int OBSTACLES_INTERVAL = 100;
+final int OBSTACLES_MIN_SIZE = 5;
+final int OBSTACLES_SIZE_RANGE = 10;
+final double PLAYER_SPEED = 3.0;
+final double PLAYER_DIAMETER = 6.0;
+final float PLAYER_DEATH_DIAMETER = 20.0;
+
 void setup() {
     r = new Random();
-    size(500, 1000);
-    player = new Player(250, 50, radians(90));
+    size(WORLD_WIDTH, WORLD_LENGTH);
+    player = new Player(INITIAL_PLAYER_X, INITIAL_PLAYER_Y, radians(INITIAL_PLAYER_ANGLE));
     world = new World();
     world.fillRandom();
-    line(200, 0, 200, 1000);
-    line(300, 0, 300, 1000);
+    line(LEFT_LINE_X, 0, LEFT_LINE_X, WORLD_LENGTH);
+    line(RIGHT_LINE_X, 0, RIGHT_LINE_X, WORLD_LENGTH);
     for (Obstacle o : world.obstacles) {
         o.drawObstacle();
     }
@@ -23,8 +39,13 @@ void draw() {
     player.move();
     player.drawPlayer();
     //player.grab(world.getClosestObstacle(player.c));
-    if (player.checkCrash() || player.c.y > 1000) {
+    if (player.checkCrash() || player.c.y > WORLD_LENGTH) {
         noLoop();
+    }
+    if (player.grabTarget == null){
+        player.grabbedLast = false;
+    } else {
+        player.grabbedLast = true;
     }
 }
 
@@ -63,18 +84,17 @@ class World {
     }
     
     public void fillRandom(){
-        for (int i = 100; i < 1000; i += 100){
-            obstacles.add(new Obstacle(r.nextInt(100) + 200, r.nextInt(100) + i, r.nextInt(10) + 5));
+        for (int i = OBSTACLES_Y_START; i < OBSTACLES_Y_END; i += OBSTACLES_INTERVAL){
+            obstacles.add(new Obstacle(r.nextInt(RIGHT_LINE_X - LEFT_LINE_X) + LEFT_LINE_X, r.nextInt(OBSTACLES_INTERVAL) + i, r.nextInt(OBSTACLES_SIZE_RANGE) + OBSTACLES_MIN_SIZE));
         }
     }
 }
 
 class Player {
-    public static final double PLAYER_SPEED = 3.0;
-    public static final double PLAYER_DIAMETER = 6.0;
     public double angle;        //or keep track of vx and vy
     public Coordinate c;
     public Obstacle grabTarget;
+    public boolean grabbedLast;
 
     public Player() {
         this(new Coordinate(0, 0), 0);
@@ -88,6 +108,7 @@ class Player {
         this.c = c;
         this.angle = angle;
         grabTarget = null;
+        grabbedLast = false;
     }
 
     public void grab(Obstacle target) {
@@ -109,9 +130,9 @@ class Player {
     }
 
     private boolean checkCrash() {
-        if ((player.c.x < 200 || player.c.x > 300) && player.grabTarget == null){
+        if ((player.c.x < LEFT_LINE_X || player.c.x > RIGHT_LINE_X) && player.grabTarget == null && player.grabbedLast == false){
             die();
-             return true;   
+            return true;   
         }
         for (Obstacle o : world.obstacles) {
             if (o.containsPoint(c, PLAYER_DIAMETER / 2)) {
@@ -124,7 +145,7 @@ class Player {
     
     public void die(){
         fill(255, 0, 0);
-        ellipse((float)c.x, (float)c.y, 25, 25);
+        ellipse((float)c.x, (float)c.y, PLAYER_DEATH_DIAMETER, PLAYER_DEATH_DIAMETER);
         fill(255, 255, 255);
     }
 
@@ -135,7 +156,6 @@ class Player {
         double newRelativeAngle = relativeAngle;
         double angleChange = (TWO_PI * PLAYER_SPEED)/circumfrence;
         if (clockWise(grabTarget)){
-        //if (true) {
             //clockwise
             newRelativeAngle += angleChange;
             angle = newRelativeAngle + HALF_PI;
@@ -165,6 +185,7 @@ class Player {
         //System.out.println("Distance: " + distance + ", Relative angle: " + degrees((float)relativeAngle) + ", Angle change: " + degrees((float)angleChange) + ", New Relative Angle: " + degrees((float)newRelativeAngle) + ", Angle: " + degrees((float)angle) + ", xOff: " + xOff + ", yOff: " + yOff);
     }
     
+    //determines if player should or should not rotate clockwise about the given target object
     public boolean clockWise(Obstacle o){
         double relativeAngle = getRelativeAngle(o);
         double clockwiseTangent = relativeAngle + HALF_PI;
