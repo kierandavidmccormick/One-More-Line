@@ -37,16 +37,12 @@ void setup() {
 }
 
 void draw() {
-    player.move();
-    player.drawPlayer();
-    //player.grab(world.getClosestObstacle(player.c));
-    if (player.checkCrash() || player.c.y > WORLD_LENGTH) {
+    if (player == null){
         noLoop();
     }
-    if (player.grabTarget == null){
-        player.grabbedLast = false;
-    } else {
-        player.grabbedLast = true;
+    player.handleMove();
+    if (!player.alive){
+        noLoop();
     }
 }
 
@@ -57,12 +53,29 @@ void mousePressed(){
 }
 
 void mouseReleased(){
-    player.unGrab();
+    if (player != null){
+        player.unGrab();
+    }
 }
 
-double runWorld(World world, Player player){
+//runs a single player forward in time, returning their ultimate y coordinate as a score
+RunResults runPlayer(Player player){
+    int turnsTaken = 0;
+    while(player.alive){
+       player.handleMove();
+       turnsTaken++;
+    }
+    return new RunResults(turnsTaken, player.c.y);
+}
+
+class RunResults {
+    public int turns;
+    public double score;
     
-    return 0;
+    public RunResults(int turns, double score){
+        this.turns = turns;
+        this.score = score;
+    }
 }
 
 class World {
@@ -116,6 +129,21 @@ class Player {
         this(new Coordinate(x, y), angle);
     }
 
+    //Handles one tick of movement for the player, including dying and grabbedLast;
+    //Version in draw() is deprecated, due to unique requirements of draw();
+    public void handleMove(){
+        move();
+        drawPlayer();
+        if (checkCrash() || c.y > WORLD_LENGTH){
+            die();
+        }
+        if (grabTarget == null){
+            grabbedLast = false;
+        } else {
+            grabbedLast = true;
+        }
+    }
+
     public Player(Coordinate c, double angle) {
         this.c = c;
         this.angle = angle;
@@ -143,7 +171,7 @@ class Player {
     }
 
     private boolean checkCrash() {
-        if ((player.c.x < LEFT_LINE_X || player.c.x > RIGHT_LINE_X) && player.grabTarget == null && player.grabbedLast == false){
+        if ((c.x < LEFT_LINE_X || c.x > RIGHT_LINE_X) && grabTarget == null && grabbedLast == false){
             die();
             return true;   
         }
@@ -196,8 +224,7 @@ class Player {
         }
         double xOff = distance * cos((float)newRelativeAngle);
         double yOff = distance * sin((float)newRelativeAngle);
-        Coordinate newC = new Coordinate(grabTarget.c.x + xOff, grabTarget.c.y + yOff);
-        c = newC;
+        c = new Coordinate(grabTarget.c.x + xOff, grabTarget.c.y + yOff);
         //System.out.println("Distance: " + distance + ", Relative angle: " + degrees((float)relativeAngle) + ", Angle change: " + degrees((float)angleChange) + ", New Relative Angle: " + degrees((float)newRelativeAngle) + ", Angle: " + degrees((float)angle) + ", xOff: " + xOff + ", yOff: " + yOff);
     }
     
@@ -263,10 +290,12 @@ class Player {
     }
 
     public void drawPlayer() {
-        if (grabTarget != null){
-             line((float)c.x, (float)c.y, (float)grabTarget.c.x, (float)grabTarget.c.y);
+        if (world.drawn){
+            if (grabTarget != null){
+                 line((float)c.x, (float)c.y, (float)grabTarget.c.x, (float)grabTarget.c.y);
+            }
+            ellipse((float)c.x, (float)c.y, (float)PLAYER_DIAMETER, (float)PLAYER_DIAMETER);
         }
-        ellipse((float)c.x, (float)c.y, (float)PLAYER_DIAMETER, (float)PLAYER_DIAMETER);
     }
 }
 
