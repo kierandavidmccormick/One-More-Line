@@ -3,7 +3,6 @@ import java.util.Comparator;
 import java.util.Random;
 
 Player player;
-World world;
 Random r;
 
 final int WORLD_LENGTH = 1000;
@@ -26,8 +25,10 @@ void setup() {
     r = new Random();
     size(WORLD_WIDTH, WORLD_LENGTH);
     player = new Player(INITIAL_PLAYER_X, INITIAL_PLAYER_Y, radians(INITIAL_PLAYER_ANGLE));
-    world = new World();
+    World world = new World();
     world.fillRandom();
+    world.drawn = true;
+    player.world = world;
     line(LEFT_LINE_X, 0, LEFT_LINE_X, WORLD_LENGTH);
     line(RIGHT_LINE_X, 0, RIGHT_LINE_X, WORLD_LENGTH);
     for (Obstacle o : world.obstacles) {
@@ -50,18 +51,27 @@ void draw() {
 }
 
 void mousePressed(){
-    player.grab(world.getClosestObstacle(player.c));
+    if (player != null){
+        player.grab(player.world.getClosestObstacle(player.c));
+    }
 }
 
 void mouseReleased(){
     player.unGrab();
 }
 
+double runWorld(World world, Player player){
+    
+    return 0;
+}
+
 class World {
-    ArrayList<Obstacle> obstacles;
+    public ArrayList<Obstacle> obstacles;
+    public boolean drawn;
 
     public World() {
         obstacles = new ArrayList();
+        drawn = false;
     }
 
     public void addObstacle(Obstacle o) {        //assumes that obstacles are added in sorted order
@@ -95,6 +105,8 @@ class Player {
     public Coordinate c;
     public Obstacle grabTarget;
     public boolean grabbedLast;
+    public World world;
+    public boolean alive;
 
     public Player() {
         this(new Coordinate(0, 0), 0);
@@ -109,6 +121,7 @@ class Player {
         this.angle = angle;
         grabTarget = null;
         grabbedLast = false;
+        alive = true;
     }
 
     public void grab(Obstacle target) {
@@ -144,9 +157,12 @@ class Player {
     }
     
     public void die(){
-        fill(255, 0, 0);
-        ellipse((float)c.x, (float)c.y, PLAYER_DEATH_DIAMETER, PLAYER_DEATH_DIAMETER);
-        fill(255, 255, 255);
+        if (world.drawn){
+            fill(255, 0, 0);
+            ellipse((float)c.x, (float)c.y, PLAYER_DEATH_DIAMETER, PLAYER_DEATH_DIAMETER);
+            fill(255, 255, 255);
+        }
+        alive = false;
     }
 
     private void grabMove() {
