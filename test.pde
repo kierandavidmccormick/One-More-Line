@@ -33,6 +33,9 @@ final int TEST_WORLDS_SIZE = 5;
 final int NEURAL_NET_OBSTACLES_BEFORE = 1;        //number of obstacles with y <= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_TOTAL = NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER;
+final int POPULATION_SIZE = 1000;
+final int GENERATIONS_COUNT_MAX = 1000;
+
 
 void setup() {
     r = new Random();
@@ -52,6 +55,7 @@ void setup() {
     initWorlds();
     try {
        player.net = trainNet();
+       player.net.randomizeWeights();
     } catch (Exception e) {
         System.err.println(e.getMessage());
     }
@@ -91,9 +95,9 @@ void initWorlds(){
 NeuralNetwork trainNet() throws PersistenceException{
     SimpleNeatParameters params = new SimpleNeatParameters();
     params.setFitnessFunction(new OMLFitnessFunction());
-    params.setPopulationSize(5);
+    params.setPopulationSize(POPULATION_SIZE);
     params.setMaximumFitness(OMLFitnessFunction.MAXIMUM_FITNESS);
-    params.setMaximumGenerations(10);
+    params.setMaximumGenerations(GENERATIONS_COUNT_MAX);
     
     NaturalSelectionOrganismSelector selector = new NaturalSelectionOrganismSelector();
     selector.setKillUnproductiveSpecies(true);
@@ -214,8 +218,9 @@ class World {
     }
     
     public void fillRandom(){
-        for (int i = OBSTACLES_Y_START; i < OBSTACLES_Y_END; i += OBSTACLES_INTERVAL){
-            obstacles.add(new Obstacle(r.nextInt(RIGHT_LINE_X - LEFT_LINE_X) + LEFT_LINE_X, r.nextInt(OBSTACLES_INTERVAL) + i, r.nextInt(OBSTACLES_SIZE_RANGE) + OBSTACLES_MIN_SIZE));
+        int obstaclesAdded = 0;
+        for (int i = OBSTACLES_Y_START; i < OBSTACLES_Y_END; i += OBSTACLES_INTERVAL, obstaclesAdded++){
+            obstacles.add(new Obstacle(obstaclesAdded != 2 ? (r.nextInt(RIGHT_LINE_X - LEFT_LINE_X) + LEFT_LINE_X) : ((LEFT_LINE_X + RIGHT_LINE_X) / 2.0), r.nextInt(OBSTACLES_INTERVAL) + i, r.nextInt(OBSTACLES_SIZE_RANGE) + OBSTACLES_MIN_SIZE));
         }
     }
 }
@@ -435,8 +440,10 @@ class Player {
         if (world.drawn){
             if (grabTarget != null){
                  line((float)c.x, (float)c.y, (float)grabTarget.c.x, (float)grabTarget.c.y);
+                 fill(200);
             }
             ellipse((float)c.x, (float)c.y, (float)PLAYER_DIAMETER, (float)PLAYER_DIAMETER);
+            fill(255);
         }
     }
 }
