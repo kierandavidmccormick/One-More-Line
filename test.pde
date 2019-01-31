@@ -1,11 +1,18 @@
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Random;
+import java.util.ArrayList;
+
+import org.neuroph.contrib.neat.gen.Organism;
+import org.neuroph.contrib.neat.gen.operations.fitness.AbstractFitnessFunction;
+import org.neuroph.core.NeuralNetwork;
+import org.neuroph.contrib.neat.gen.impl.SimpleNeatParameters;
 
 Player player;
 Random r;
+ArrayList<World> worlds;
 
-final int WORLD_LENGTH = 1000;
+static final int WORLD_LENGTH = 1000;
 final int WORLD_WIDTH = 500;
 final int INITIAL_PLAYER_ANGLE = 90;
 final int INITIAL_PLAYER_X = 250;
@@ -20,10 +27,15 @@ final int OBSTACLES_SIZE_RANGE = 10;
 final double PLAYER_SPEED = 3.0;
 final double PLAYER_DIAMETER = 6.0;
 final float PLAYER_DEATH_DIAMETER = 20.0;
+final int TEST_WORLDS_SIZE = 5;
+final int NEURAL_NET_OBSTACLES_BEFORE = 1;        //number of obstacles with y <= player.c.y given to the nn
+final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >= player.c.y given to the nn
+final int NEURAL_NET_OBSTACLES_TOTAL = NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER;
 
 void setup() {
     r = new Random();
-    size(WORLD_WIDTH, WORLD_LENGTH);
+    //size(WORLD_WIDTH, WORLD_LENGTH);
+    size(500, 1000);                        //REMEMBER TO RESET THIS
     player = new Player(INITIAL_PLAYER_X, INITIAL_PLAYER_Y, radians(INITIAL_PLAYER_ANGLE));
     World world = new World();
     world.fillRandom();
@@ -33,6 +45,13 @@ void setup() {
     line(RIGHT_LINE_X, 0, RIGHT_LINE_X, WORLD_LENGTH);
     for (Obstacle o : world.obstacles) {
         o.drawObstacle();
+    }
+    
+    initWorlds();
+    try {
+       player.net = trainNet();
+    } catch (Exception e) {
+        System.err.println(e.getMessage());
     }
 }
 
@@ -55,6 +74,61 @@ void mousePressed(){
 void mouseReleased(){
     if (player != null){
         player.unGrab();
+    }
+}
+
+void initWorlds(){
+    worlds = new ArrayList();
+    for (int i = 0; i < TEST_WORLDS_SIZE; i++){
+        World w = new World();
+        w.fillRandom();
+        worlds.add(w);
+    }
+}
+
+NeuralNetwork trainNet() throws PersistenceException{
+    SimpleNeatParameters params = new SimpleNeatParameters();
+    params.setFitnessFunction(new OMLFitnessFunction());
+    params.setPopulationSize(5);
+    params.setMaximumFitness(OMLFitnessFunction.MAXIMUM_FITNESS);
+    params.setMaximumGenerations(10);
+    
+    NaturalSelectionOrganismSelector selector = new NaturalSelectionOrganismSelector();
+    selector.setKillUnproductiveSpecies(true);
+    selector.setElitismEnabled(true);
+    selector.setSurvivalRatio(.5);
+    params.setOrganismSelector(selector);
+    
+    ArrayList<NeuronGene> inputGenes = new ArrayList();
+    for (int i = 0; i < NEURAL_NET_OBSTACLES_TOTAL + 3; i++) {
+        inputGenes.add(new NeuronGene(NeuronType.INPUT, params));
+    }
+    ArrayList<NeuronGene> outputGenes = new ArrayList();
+    outputGenes.add(new NeuronGene(NeuronType.OUTPUT, params));
+    
+    Evolver evolver = null;
+    try {
+        evolver = Evolver.createNew(params, inputGenes, outputGenes);
+    } catch (Exception e){
+        System.out.println(e.getMessage());
+        System.out.println(e.getStackTrace());
+    }
+    Organism best = evolver.evolve();
+    
+    return params.getNeuralNetworkBuilder().createNeuralNetwork(best);
+}
+
+class OMLFitnessFunction extends AbstractFitnessFunction {
+    static final int MAXIMUM_FITNESS = WORLD_LENGTH;
+    
+    double evaluate (Organism o, NeuralNetwork nn) {
+        int netScore = 0;
+        for (World world : worlds){
+            Player player = new Player(INITIAL_PLAYER_X, INITIAL_PLAYER_Y, radians(INITIAL_PLAYER_ANGLE));
+            player.world = world;
+            netScore += runPlayer(player).score;        //TODO: more advanced calculation of fitness
+        }
+        return (double)netScore;
     }
 }
 
@@ -106,6 +180,37 @@ class World {
          return obsArray;
     }
     
+    //gets the relevant obstacles for a given coordinate
+    //the obstacle before and the four after the given location
+    //if any of these don't exist, the value at that index will be null
+    public ArrayList<Obstacle> getNetObstacles(Coordinate c) {
+        ArrayList<Obstacle> netObs = new ArrayList();
+        //add in valid after objects and before object, valid or not
+        for (int i = 0; i < obstacles.size(); i++) {
+            if (netObs.size() == NEURAL_NET_OBSTACLES_TOTAL) {
+                break;
+            }
+            if (obstacles.get(i).c.y > c.y && netObs.size() == 0) {
+                if (i == 0){
+                    netObs.add(null);
+                } else {
+                    netObs.add(obstacles.get(i-1));
+                }
+                i--;
+                continue;            //to ensure functionality in the event of 0 forward obstacles given
+            }
+            if (obstacles.get(i).c.y > c.y){
+                netObs.add(obstacles.get(i));
+            }
+            
+        }
+        //add in invalid after objects
+        while (netObs.size() > NEURAL_NET_OBSTACLES_TOTAL){
+            netObs.add(null);
+        }
+        return netObs;
+    }
+    
     public void fillRandom(){
         for (int i = OBSTACLES_Y_START; i < OBSTACLES_Y_END; i += OBSTACLES_INTERVAL){
             obstacles.add(new Obstacle(r.nextInt(RIGHT_LINE_X - LEFT_LINE_X) + LEFT_LINE_X, r.nextInt(OBSTACLES_INTERVAL) + i, r.nextInt(OBSTACLES_SIZE_RANGE) + OBSTACLES_MIN_SIZE));
@@ -120,6 +225,7 @@ class Player {
     public boolean grabbedLast;
     public World world;
     public boolean alive;
+    NeuralNetwork net;
 
     public Player() {
         this(new Coordinate(0, 0), 0);
@@ -129,9 +235,42 @@ class Player {
         this(new Coordinate(x, y), angle);
     }
 
+    public Player(Coordinate c, double angle) {
+        this.c = c;
+        this.angle = angle;
+        grabTarget = null;
+        grabbedLast = false;
+        alive = true;
+    }
+    
+    public void setNetworkInput(){
+        if (world == null || net == null){
+            return;
+        }
+        ArrayList<Obstacle> obstacles = world.getNetObstacles(c);
+        double[] networkInput = new double[NEURAL_NET_OBSTACLES_TOTAL * 3 + 3];
+        for (int i = 0; i < NEURAL_NET_OBSTACLES_TOTAL; i++){
+            networkInput[i * 3] = obstacles.get(i).c.x - c.x;
+            networkInput[i * 3 + 1] = obstacles.get(i).c.y - c.y;
+            networkInput[i * 3 + 2] = obstacles.get(i).diameter / 2.0;
+        }
+        networkInput[NEURAL_NET_OBSTACLES_TOTAL * 3] = c.x - LEFT_LINE_X;
+        networkInput[NEURAL_NET_OBSTACLES_TOTAL * 3 + 1] = PLAYER_SPEED * sin((float)angle);
+        networkInput[NEURAL_NET_OBSTACLES_TOTAL * 3 + 2] = PLAYER_SPEED * cos((float)angle);
+        net.setInput(networkInput);
+    }
+
     //Handles one tick of movement for the player, including dying and grabbedLast;
     //Version in draw() is deprecated, due to unique requirements of draw();
     public void handleMove(){
+        if (net != null){
+            setNetworkInput();
+            if (net.getOutput()[0] > 0){
+                grab(world.getClosestObstacle(c));
+            } else {
+                unGrab();
+            }
+        }
         move();
         drawPlayer();
         if (checkCrash() || c.y > WORLD_LENGTH){
@@ -142,14 +281,6 @@ class Player {
         } else {
             grabbedLast = true;
         }
-    }
-
-    public Player(Coordinate c, double angle) {
-        this.c = c;
-        this.angle = angle;
-        grabTarget = null;
-        grabbedLast = false;
-        alive = true;
     }
 
     public void grab(Obstacle target) {
