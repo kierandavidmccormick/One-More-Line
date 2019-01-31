@@ -2,6 +2,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.Random;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Vector;
 
 import org.neuroph.contrib.neat.gen.Organism;
 import org.neuroph.contrib.neat.gen.operations.fitness.AbstractFitnessFunction;
@@ -100,7 +102,7 @@ NeuralNetwork trainNet() throws PersistenceException{
     params.setOrganismSelector(selector);
     
     ArrayList<NeuronGene> inputGenes = new ArrayList();
-    for (int i = 0; i < NEURAL_NET_OBSTACLES_TOTAL + 3; i++) {
+    for (int i = 0; i < NEURAL_NET_OBSTACLES_TOTAL * 3 + 3; i++) {
         inputGenes.add(new NeuronGene(NeuronType.INPUT, params));
     }
     ArrayList<NeuronGene> outputGenes = new ArrayList();
@@ -111,7 +113,7 @@ NeuralNetwork trainNet() throws PersistenceException{
         evolver = Evolver.createNew(params, inputGenes, outputGenes);
     } catch (Exception e){
         System.out.println(e.getMessage());
-        System.out.println(e.getStackTrace());
+        e.printStackTrace();
     }
     Organism best = evolver.evolve();
     
@@ -243,6 +245,10 @@ class Player {
         alive = true;
     }
     
+    public String toString(){
+        return "Angle: " + radians((float)angle) + ", X: " + c.x + ", Y: " + c.y;
+    }
+    
     public void setNetworkInput(){
         if (world == null || net == null){
             return;
@@ -250,9 +256,15 @@ class Player {
         ArrayList<Obstacle> obstacles = world.getNetObstacles(c);
         double[] networkInput = new double[NEURAL_NET_OBSTACLES_TOTAL * 3 + 3];
         for (int i = 0; i < NEURAL_NET_OBSTACLES_TOTAL; i++){
-            networkInput[i * 3] = obstacles.get(i).c.x - c.x;
-            networkInput[i * 3 + 1] = obstacles.get(i).c.y - c.y;
-            networkInput[i * 3 + 2] = obstacles.get(i).diameter / 2.0;
+            if (obstacles.get(i) != null) {
+                networkInput[i * 3] = obstacles.get(i).c.x - c.x;
+                networkInput[i * 3 + 1] = obstacles.get(i).c.y - c.y;
+                networkInput[i * 3 + 2] = obstacles.get(i).diameter / 2.0;
+            } else {
+                networkInput[i * 3] = -1000000.0;
+                networkInput[i * 3 + 1] = -100000.0;
+                networkInput[i * 3 + 2] = -100000.0;
+            }
         }
         networkInput[NEURAL_NET_OBSTACLES_TOTAL * 3] = c.x - LEFT_LINE_X;
         networkInput[NEURAL_NET_OBSTACLES_TOTAL * 3 + 1] = PLAYER_SPEED * sin((float)angle);
@@ -265,7 +277,7 @@ class Player {
     public void handleMove(){
         if (net != null){
             setNetworkInput();
-            if (net.getOutput()[0] > 0){
+            if (net.getOutput().get(0) > 0){
                 grab(world.getClosestObstacle(c));
             } else {
                 unGrab();
