@@ -207,7 +207,7 @@ class World {
             
         }
         //add in invalid after objects
-        while (netObs.size() > NEURAL_NET_OBSTACLES_TOTAL){
+        while (netObs.size() < NEURAL_NET_OBSTACLES_TOTAL){
             netObs.add(null);
         }
         return netObs;
@@ -273,7 +273,6 @@ class Player {
     }
 
     //Handles one tick of movement for the player, including dying and grabbedLast;
-    //Version in draw() is deprecated, due to unique requirements of draw();
     public void handleMove(){
         if (net != null){
             setNetworkInput();
