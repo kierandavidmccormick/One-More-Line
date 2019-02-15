@@ -30,16 +30,17 @@ final int OBSTACLES_SIZE_RANGE = 10;
 final double PLAYER_SPEED = 3.0;
 final double PLAYER_DIAMETER = 6.0;
 final float PLAYER_DEATH_DIAMETER = 20.0;
-final int TEST_WORLDS_SIZE = 5;
+static final int TEST_WORLDS_SIZE = 5;
 final int NEURAL_NET_OBSTACLES_BEFORE = 1;        //number of obstacles with y <= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_TOTAL = NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER;
-final int POPULATION_SIZE = 1000;
-final int GENERATIONS_COUNT_MAX = 1000;
+final int POPULATION_SIZE = 10;
+final int GENERATIONS_COUNT_MAX = 10;
 
 
 void setup() {
     isRunning = false;
+    System.out.println("START");
     r = new Random();
     //size(WORLD_WIDTH, WORLD_LENGTH);
     size(500, 1000);                        //REMEMBER TO RESET THIS
@@ -57,6 +58,7 @@ void setup() {
     initWorlds();
     try {
        player.net = trainNet();
+       printNet(player.net);
     } catch (Exception e) {
         System.err.println(e.getMessage());
     }
@@ -99,6 +101,7 @@ NeuralNetwork trainNet() throws PersistenceException{
     params.setFitnessFunction(new OMLFitnessFunction());
     params.setPopulationSize(POPULATION_SIZE);
     params.setMaximumFitness(OMLFitnessFunction.MAXIMUM_FITNESS);
+    System.out.println("MAXIMUM FITNESS: " + OMLFitnessFunction.MAXIMUM_FITNESS);
     params.setMaximumGenerations(GENERATIONS_COUNT_MAX);
     
     NaturalSelectionOrganismSelector selector = new NaturalSelectionOrganismSelector();
@@ -126,8 +129,36 @@ NeuralNetwork trainNet() throws PersistenceException{
     return params.getNeuralNetworkBuilder().createNeuralNetwork(best);
 }
 
+void printNet(NeuralNetwork network){
+    HashMap<Neuron, String> netMap = new HashMap<Neuron, String>();
+    int layerCount = 0;
+    int neuronCount;
+    for (Layer layer : network.getLayers()){
+        neuronCount = 0;
+        for (Neuron neuron : layer.getNeurons()){
+            netMap.put(neuron,layerCount + ":" + neuronCount);
+            neuronCount++;
+        }
+        layerCount++;
+    }
+    for (Layer layer : network.getLayers()){
+        for (Neuron neuron : layer.getNeurons()){
+            System.out.print("Neuron  " + netMap.get(neuron));
+            if (neuron.getOutConnections().size() != 0){
+                System.out.print("  connects to");
+                for (Connection connection : neuron.getOutConnections()){
+                    System.out.print("  " + netMap.get(connection.getConnectedNeuron()));
+                }
+            } else {
+                System.out.print("  Is output");
+            }
+            System.out.println();
+        }
+    }
+}
+
 class OMLFitnessFunction extends AbstractFitnessFunction {
-    static final int MAXIMUM_FITNESS = WORLD_LENGTH;
+    static final int MAXIMUM_FITNESS = WORLD_LENGTH * TEST_WORLDS_SIZE;
     
     double evaluate (Organism o, NeuralNetwork nn) {
         int netScore = 0;
@@ -136,6 +167,7 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
             player.world = world;
             netScore += runPlayer(player).score;        //TODO: more advanced calculation of fitness
         }
+        System.out.println("Score: " + netScore);
         return (double)netScore;
     }
 }
