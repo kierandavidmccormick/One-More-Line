@@ -13,6 +13,7 @@ import org.neuroph.contrib.neat.gen.impl.SimpleNeatParameters;
 Player player;
 Random r;
 ArrayList<World> worlds;
+boolean isRunning;
 
 static final int WORLD_LENGTH = 1000;
 final int WORLD_WIDTH = 500;
@@ -38,6 +39,7 @@ final int GENERATIONS_COUNT_MAX = 1000;
 
 
 void setup() {
+    isRunning = false;
     r = new Random();
     //size(WORLD_WIDTH, WORLD_LENGTH);
     size(500, 1000);                        //REMEMBER TO RESET THIS
@@ -55,10 +57,10 @@ void setup() {
     initWorlds();
     try {
        player.net = trainNet();
-       player.net.randomizeWeights();
     } catch (Exception e) {
         System.err.println(e.getMessage());
     }
+    isRunning = true;
 }
 
 void draw() {
@@ -275,6 +277,7 @@ class Player {
         networkInput[NEURAL_NET_OBSTACLES_TOTAL * 3 + 1] = PLAYER_SPEED * sin((float)angle);
         networkInput[NEURAL_NET_OBSTACLES_TOTAL * 3 + 2] = PLAYER_SPEED * cos((float)angle);
         net.setInput(networkInput);
+        net.calculate();
     }
 
     //Handles one tick of movement for the player, including dying and grabbedLast;
