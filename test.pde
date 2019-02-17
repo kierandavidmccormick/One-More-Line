@@ -36,7 +36,7 @@ final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >=
 final int NEURAL_NET_OBSTACLES_TOTAL = NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER;
 final int POPULATION_SIZE = 10;
 final int GENERATIONS_COUNT_MAX = 10;
-
+final double NEURONS_SIGMOID_SLOPE = .2;
 
 void setup() {
     isRunning = false;
@@ -58,7 +58,7 @@ void setup() {
     initWorlds();
     try {
        player.net = trainNet();
-       printNet(player.net);
+       System.out.println(netToString(player.net));
     } catch (Exception e) {
         System.err.println(e.getMessage());
     }
@@ -101,7 +101,6 @@ NeuralNetwork trainNet() throws PersistenceException{
     params.setFitnessFunction(new OMLFitnessFunction());
     params.setPopulationSize(POPULATION_SIZE);
     params.setMaximumFitness(OMLFitnessFunction.MAXIMUM_FITNESS);
-    System.out.println("MAXIMUM FITNESS: " + OMLFitnessFunction.MAXIMUM_FITNESS);
     params.setMaximumGenerations(GENERATIONS_COUNT_MAX);
     
     NaturalSelectionOrganismSelector selector = new NaturalSelectionOrganismSelector();
@@ -112,10 +111,10 @@ NeuralNetwork trainNet() throws PersistenceException{
     
     ArrayList<NeuronGene> inputGenes = new ArrayList();
     for (int i = 0; i < NEURAL_NET_OBSTACLES_TOTAL * 3 + 3; i++) {
-        inputGenes.add(new NeuronGene(NeuronType.INPUT, params));
+        inputGenes.add(new NeuronGene(NeuronType.INPUT, params, NEURONS_SIGMOID_SLOPE));
     }
     ArrayList<NeuronGene> outputGenes = new ArrayList();
-    outputGenes.add(new NeuronGene(NeuronType.OUTPUT, params));
+    outputGenes.add(new NeuronGene(NeuronType.OUTPUT, params, NEURONS_SIGMOID_SLOPE));
     
     Evolver evolver = null;
     try {
@@ -129,10 +128,11 @@ NeuralNetwork trainNet() throws PersistenceException{
     return params.getNeuralNetworkBuilder().createNeuralNetwork(best);
 }
 
-void printNet(NeuralNetwork network){
+String netToString(NeuralNetwork network){
     HashMap<Neuron, String> netMap = new HashMap<Neuron, String>();
     int layerCount = 0;
     int neuronCount;
+    String outString = new String();
     for (Layer layer : network.getLayers()){
         neuronCount = 0;
         for (Neuron neuron : layer.getNeurons()){
@@ -143,19 +143,27 @@ void printNet(NeuralNetwork network){
     }
     for (Layer layer : network.getLayers()){
         for (Neuron neuron : layer.getNeurons()){
-            System.out.print("Neuron  " + netMap.get(neuron));
+            outString += "Neuron  " + netMap.get(neuron);
+            //System.out.print("Neuron  " + netMap.get(neuron));
             if (neuron.getOutConnections().size() != 0){
-                System.out.print("  connects to");
+                outString += "  connects to";
+                //System.out.print("  connects to");
                 for (Connection connection : neuron.getOutConnections()){
-                    System.out.print("  " + netMap.get(connection.getConnectedNeuron()));
+                    outString += "  " + netMap.get(connection.getConnectedNeuron()) + "  weight  " + connection.getWeight();
+                    //System.out.print("  " + netMap.get(connection.getConnectedNeuron()));
                 }
             } else {
-                System.out.print("  Is output");
+                outString += "  Is output";
+                //System.out.print("  Is output");
             }
-            System.out.println();
+            //outString += "  input function  " + neuron.getInputFunction() + "  transfer function  " + neuron.getTransferFunction();
+            outString += "\n";
+            //System.out.println();
         }
     }
+    return outString;
 }
+
 
 class OMLFitnessFunction extends AbstractFitnessFunction {
     static final int MAXIMUM_FITNESS = WORLD_LENGTH * TEST_WORLDS_SIZE;
@@ -167,7 +175,7 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
             player.world = world;
             netScore += runPlayer(player).score;        //TODO: more advanced calculation of fitness
         }
-        System.out.println("Score: " + netScore);
+        //System.out.println("Score: " + netScore + "  Hash: " + netToString(nn).hashCode());
         return (double)netScore;
     }
 }
@@ -316,7 +324,8 @@ class Player {
     public void handleMove(){
         if (net != null){
             setNetworkInput();
-            if (net.getOutput().get(0) > 0){
+            //System.out.println(net.getOutput());
+            if (net.getOutput().get(0) > .8){
                 grab(world.getClosestObstacle(c));
             } else {
                 unGrab();
