@@ -24,6 +24,8 @@ final int LEFT_LINE_X = 200;
 final int RIGHT_LINE_X = 300;
 final int OBSTACLES_Y_START = 100;
 final int OBSTACLES_Y_END = WORLD_LENGTH;
+final int GAP_OBSTACLES = 2;
+final int GAP_WIDTH = 20;
 final int OBSTACLES_INTERVAL = 100;
 final int OBSTACLES_MIN_SIZE = 5;
 final int OBSTACLES_SIZE_RANGE = 10;
@@ -262,7 +264,16 @@ class World {
     public void fillRandom(){
         int obstaclesAdded = 0;
         for (int i = OBSTACLES_Y_START; i < OBSTACLES_Y_END; i += OBSTACLES_INTERVAL, obstaclesAdded++){
-            obstacles.add(new Obstacle(obstaclesAdded != 2 ? (r.nextInt(RIGHT_LINE_X - LEFT_LINE_X) + LEFT_LINE_X) : ((LEFT_LINE_X + RIGHT_LINE_X) / 2.0), r.nextInt(OBSTACLES_INTERVAL) + i, r.nextInt(OBSTACLES_SIZE_RANGE) + OBSTACLES_MIN_SIZE));
+            obstacles.add(new Obstacle(
+            /*
+             * excessively long conditional behavior as follows:
+             * obstaclesAdded > GAP_OBSTACLES : (r.nextInt(RIGHT_LINE_X - LEFT_LINE_X) + LEFT_LINE_X)
+             * obstaclesAdded == GAP_OBSTACLES : (LEFT_LINE_X + RIGHT_LINE_X) / 2.0
+             * obstaclesAdded < GAP_OBSTACLES : r.nextInt((RIGHT_LINE_X - LEFT_LINE_X - GAP_WIDTH) / 2) + LEFT_LINE_X + ((RIGHT_LINE_X - LEFT_LINE_X - GAP_WIDTH) / 2 + GAP_WIDTH) * r.nextInt(1)
+             */
+            obstaclesAdded > 2 ? (r.nextInt(RIGHT_LINE_X - LEFT_LINE_X) + LEFT_LINE_X) : obstaclesAdded == 2 ? (LEFT_LINE_X + RIGHT_LINE_X) / 2.0 : r.nextInt((RIGHT_LINE_X - LEFT_LINE_X - GAP_WIDTH) / 2) + LEFT_LINE_X + ((RIGHT_LINE_X - LEFT_LINE_X - GAP_WIDTH) / 2 + GAP_WIDTH) * r.nextInt(2),
+            r.nextInt(OBSTACLES_INTERVAL) + i,
+            r.nextInt(OBSTACLES_SIZE_RANGE) + OBSTACLES_MIN_SIZE));
         }
     }
 }
