@@ -14,6 +14,7 @@ Player player;
 Random r;
 ArrayList<World> worlds;
 boolean isRunning;
+int worldIndex;
 
 static final int WORLD_LENGTH = 1000;
 final int WORLD_WIDTH = 500;
@@ -40,24 +41,16 @@ final int POPULATION_SIZE = 10;
 final int GENERATIONS_COUNT_MAX = 10;
 final double NEURONS_SIGMOID_SLOPE = .2;
 final int MAXIMUM_SIMULATION_TURNS = (int)((WORLD_LENGTH / PLAYER_SPEED) * 4.0);
+final int DEFAULT_BACKGROUND_COLOR = 200;
 
 void setup() {
     isRunning = false;
+    worldIndex = 0;
     System.out.println("START");
     r = new Random();
     //size(WORLD_WIDTH, WORLD_LENGTH);
     size(500, 1000);                        //REMEMBER TO RESET THIS
-    player = new Player(INITIAL_PLAYER_X, INITIAL_PLAYER_Y, radians(INITIAL_PLAYER_ANGLE));
-    World world = new World();
-    world.fillRandom();
-    world.drawn = true;
-    player.world = world;
-    line(LEFT_LINE_X, 0, LEFT_LINE_X, WORLD_LENGTH);
-    line(RIGHT_LINE_X, 0, RIGHT_LINE_X, WORLD_LENGTH);
-    for (Obstacle o : world.obstacles) {
-        o.drawObstacle();
-    }
-    
+    player = new Player(0, 0, 0);            //these get overwritten anyways
     initWorlds();
     try {
        player.net = trainNet();
@@ -65,6 +58,8 @@ void setup() {
     } catch (Exception e) {
         System.err.println(e.getMessage());
     }
+    worlds.get(0).drawn = true;
+    setupWorld(worlds.get(0));
     isRunning = true;
 }
 
@@ -74,7 +69,23 @@ void draw() {
     }
     player.handleMove(0);
     if (!player.alive){
-        noLoop();
+        delay(100);
+        worlds.get(worldIndex).drawn = false;
+        worldIndex +=1;
+        worldIndex %= TEST_WORLDS_SIZE;
+        worlds.get(worldIndex).drawn = true;
+        setupWorld(worlds.get(worldIndex));
+    }
+}
+
+void setupWorld(World w){
+    player.resetPlayer(INITIAL_PLAYER_X, INITIAL_PLAYER_Y, radians(INITIAL_PLAYER_ANGLE));
+    player.world = w;
+    background(DEFAULT_BACKGROUND_COLOR);
+    line(LEFT_LINE_X, 0, LEFT_LINE_X, WORLD_LENGTH);
+    line(RIGHT_LINE_X, 0, RIGHT_LINE_X, WORLD_LENGTH);
+    for (Obstacle o : w.obstacles) {
+        o.drawObstacle();
     }
 }
 
@@ -178,7 +189,7 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
             player.world = world;
             RunResults results = runPlayer(player);
             if (results.turns > MAXIMUM_SIMULATION_TURNS){
-                return 1;    //I do not take kindly to mere AI wasting my valuable time and unnecessarily extending the simulation
+                return 1;    //I do not take kindly to mere AI wasting my valuable time
             }
             if (results.turnsGrabbed != 0 && results.turnsNotGrabbed != 0){
                 netScore += results.score;
@@ -317,6 +328,18 @@ class Player {
         alive = true;
     }
     
+    public void resetPlayer(double x, double y, double angle) {
+        resetPlayer(new Coordinate(x, y), angle);
+    }
+    
+    public void resetPlayer(Coordinate c, double angle){
+        this.c = c;
+        this.angle = angle;
+        grabTarget = null;
+        grabbedLast = false;
+        alive = true;
+    }
+    
     public String toString(){
         return "Angle: " + radians((float)angle) + ", X: " + c.x + ", Y: " + c.y;
     }
@@ -392,7 +415,7 @@ class Player {
     }
 
     private boolean checkCrash() {
-        if ((c.x < LEFT_LINE_X || c.x > RIGHT_LINE_X) && grabTarget == null && grabbedLast == false){
+        if ((c.x < LEFT_LINE_X || c.x > RIGHT_LINE_X || c.y < 0) && grabTarget == null && grabbedLast == false){
             die();
             return true;   
         }
