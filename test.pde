@@ -185,19 +185,26 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
 //runs a single player forward in time, returning their ultimate y coordinate as a score
 RunResults runPlayer(Player player){
     int turnsTaken = 0;
+    int turnsGrabbed = 0;
     while(player.alive){
-       player.handleMove();
+       if (player.handleMove()) {
+           turnsGrabbed++;
+       }
        turnsTaken++;
     }
-    return new RunResults(turnsTaken, player.c.y);
+    return new RunResults(turnsTaken, turnsGrabbed, turnsTaken - turnsGrabbed, player.c.y);
 }
 
 class RunResults {
     public int turns;
+    public int turnsGrabbed;
+    public int turnsNotGrabbed;
     public double score;
     
-    public RunResults(int turns, double score){
+    public RunResults(int turns, int turnsGrabbed, int turnsNotGrabbbed, double score){
         this.turns = turns;
+        this.turnsGrabbed = turnsGrabbed;
+        this.turnsNotGrabbed = turnsNotGrabbed;
         this.score = score;
     }
 }
@@ -332,12 +339,14 @@ class Player {
     }
 
     //Handles one tick of movement for the player, including dying and grabbedLast;
-    public void handleMove(){
+    //returns if the player successfully grabbed a target
+    public boolean handleMove(){
+        boolean grabbed = false;
         if (net != null){
             setNetworkInput();
             //System.out.println(net.getOutput());
             if (net.getOutput().get(0) > .8){
-                grab(world.getClosestObstacle(c));
+                grabbed = grab(world.getClosestObstacle(c));
             } else {
                 unGrab();
             }
@@ -352,12 +361,16 @@ class Player {
         } else {
             grabbedLast = true;
         }
+        return grabbed;
     }
 
-    public void grab(Obstacle target) {
+    //returns if successfully grabbed target
+    public boolean grab(Obstacle target) {
         if (compareAngle(target)){
              grabTarget = target;
+             return true;
         }
+        return false;
     }
 
     public void unGrab() {
