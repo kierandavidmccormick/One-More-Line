@@ -39,6 +39,7 @@ final int NEURAL_NET_OBSTACLES_TOTAL = NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_
 final int POPULATION_SIZE = 10;
 final int GENERATIONS_COUNT_MAX = 10;
 final double NEURONS_SIGMOID_SLOPE = .2;
+final int MAXIMUM_SIMULATION_TURNS = (int)((WORLD_LENGTH / PLAYER_SPEED) * 4.0);
 
 void setup() {
     isRunning = false;
@@ -71,7 +72,7 @@ void draw() {
     if (player == null){
         noLoop();
     }
-    player.handleMove();
+    player.handleMove(0);
     if (!player.alive){
         noLoop();
     }
@@ -171,12 +172,14 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
     static final int MAXIMUM_FITNESS = WORLD_LENGTH * TEST_WORLDS_SIZE;
     
     double evaluate (Organism o, NeuralNetwork nn) {
-        int netScore = 1;
+        int netScore = 1;        //NOTE: This will break if the net score == zero, and probably if it is > 0.
         for (World world : worlds){
             Player player = new Player(INITIAL_PLAYER_X, INITIAL_PLAYER_Y, radians(INITIAL_PLAYER_ANGLE));
             player.world = world;
-            //netScore += runPlayer(player).score;        //TODO: more advanced calculation of fitness
             RunResults results = runPlayer(player);
+            if (results.turns > MAXIMUM_SIMULATION_TURNS){
+                return 1;    //I do not take kindly to mere AI wasting my valuable time and unnecessarily extending the simulation
+            }
             if (results.turnsGrabbed != 0 && results.turnsNotGrabbed != 0){
                 netScore += results.score;
             }
@@ -191,7 +194,7 @@ RunResults runPlayer(Player player){
     int turnsTaken = 0;
     int turnsGrabbed = 0;
     while(player.alive){
-       if (player.handleMove()) {
+       if (player.handleMove(turnsTaken)) {
            turnsGrabbed++;
        }
        turnsTaken++;
@@ -344,7 +347,7 @@ class Player {
 
     //Handles one tick of movement for the player, including dying and grabbedLast;
     //returns if the player successfully grabbed a target
-    public boolean handleMove(){
+    public boolean handleMove(int turnCount){
         boolean grabbed = false;        //wheither the player tries to grab on to anything
         if (net != null){
             setNetworkInput();
@@ -358,7 +361,7 @@ class Player {
         }
         move();
         drawPlayer();
-        if (checkCrash() || c.y > WORLD_LENGTH){
+        if (checkCrash() || c.y > WORLD_LENGTH || turnCount > MAXIMUM_SIMULATION_TURNS){
             die();
         }
         if (grabTarget == null){        //wheither the player successfully attempted to grab on to anything
