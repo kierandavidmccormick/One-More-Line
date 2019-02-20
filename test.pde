@@ -175,14 +175,20 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
         for (World world : worlds){
             Player player = new Player(INITIAL_PLAYER_X, INITIAL_PLAYER_Y, radians(INITIAL_PLAYER_ANGLE));
             player.world = world;
-            netScore += runPlayer(player).score;        //TODO: more advanced calculation of fitness
+            //netScore += runPlayer(player).score;        //TODO: more advanced calculation of fitness
+            RunResults results = runPlayer(player);
+            //only counts a run if the player both grabbed and did not grab a target in the round
+            //avoids both clinging and apathetic behavior from players
+            if (results.turnsGrabbed != 0 && results.turnsNotGrabbed != 0){
+                netScore += results.score;
+            }
         }
         //System.out.println("Score: " + netScore + "  Hash: " + netToString(nn).hashCode());
         return (double)netScore;
     }
 }
 
-//runs a single player forward in time, returning their ultimate y coordinate as a score
+//runs a single player forward in time, returning information about their run as a score
 RunResults runPlayer(Player player){
     int turnsTaken = 0;
     int turnsGrabbed = 0;
@@ -339,14 +345,15 @@ class Player {
     }
 
     //Handles one tick of movement for the player, including dying and grabbedLast;
-    //returns if the player successfully grabbed a target
+    //returns if the player attempted to grab a target
     public boolean handleMove(){
         boolean grabbed = false;
         if (net != null){
             setNetworkInput();
             //System.out.println(net.getOutput());
             if (net.getOutput().get(0) > .8){
-                grabbed = grab(world.getClosestObstacle(c));
+                grab(world.getClosestObstacle(c));
+                grabbed = true;
             } else {
                 unGrab();
             }
@@ -364,13 +371,10 @@ class Player {
         return grabbed;
     }
 
-    //returns if successfully grabbed target
-    public boolean grab(Obstacle target) {
+    public void grab(Obstacle target) {
         if (compareAngle(target)){
              grabTarget = target;
-             return true;
         }
-        return false;
     }
 
     public void unGrab() {
