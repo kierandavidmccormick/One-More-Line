@@ -187,12 +187,16 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
         for (World world : worlds){
             Player player = new Player(INITIAL_PLAYER_X, INITIAL_PLAYER_Y, radians(INITIAL_PLAYER_ANGLE));
             player.world = world;
+            player.net = nn;
             RunResults results = runPlayer(player);
             if (results.turns > MAXIMUM_SIMULATION_TURNS){
+                System.out.println("KILLED FOR EXCESS TIME");
                 return 1;    //I do not take kindly to mere AI wasting my valuable time
             }
             if (results.turnsGrabbed != 0 && results.turnsNotGrabbed != 0){
                 netScore += results.score;
+            } else {
+                //System.out.println("Turns Taken: " + results.turns + ", Turns Grabbed: " + results.turnsGrabbed + ", Turns Not: " + results.turnsNotGrabbed);
             }
         }
         System.out.println("Score: " + netScore + "  Hash: " + netToString(nn).hashCode());
@@ -219,87 +223,11 @@ class RunResults {
     public int turnsNotGrabbed;
     public double score;
     
-    public RunResults(int turns, int turnsGrabbed, int turnsNotGrabbbed, double score){
+    public RunResults(int turns, int turnsGrabbed, int turnsNotGrabbed, double score){
         this.turns = turns;
         this.turnsGrabbed = turnsGrabbed;
         this.turnsNotGrabbed = turnsNotGrabbed;
         this.score = score;
-    }
-}
-
-class World {
-    public ArrayList<Obstacle> obstacles;
-    public boolean drawn;
-
-    public World() {
-        obstacles = new ArrayList();
-        drawn = false;
-    }
-
-    public void addObstacle(Obstacle o) {        //assumes that obstacles are added in sorted order
-        obstacles.add(o);
-    }
-    
-    public Obstacle getClosestObstacle(Coordinate coord){
-         return getClosestObstacles(coord).get(0);
-    }
-    
-    public ArrayList<Obstacle> getClosestObstacles(Coordinate coord){
-        ArrayList<Obstacle> obsArray = new ArrayList(obstacles);
-         final Coordinate c = coord;
-         Collections.sort(obsArray, new Comparator<Obstacle>() {
-             public int compare(Obstacle o1, Obstacle o2) {
-                 return o1.distanceTo(c) < o2.distanceTo(c) ? -1 : o1.distanceTo(c) == o2.distanceTo(c) ? 0 : 1;
-             }
-         });
-         return obsArray;
-    }
-    
-    //gets the relevant obstacles for a given coordinate
-    //the obstacle before and the four after the given location
-    //if any of these don't exist, the value at that index will be null
-    public ArrayList<Obstacle> getNetObstacles(Coordinate c) {
-        ArrayList<Obstacle> netObs = new ArrayList();
-        //add in valid after objects and before object, valid or not
-        for (int i = 0; i < obstacles.size(); i++) {
-            if (netObs.size() == NEURAL_NET_OBSTACLES_TOTAL) {
-                break;
-            }
-            if (obstacles.get(i).c.y > c.y && netObs.size() == 0) {
-                if (i == 0){
-                    netObs.add(null);
-                } else {
-                    netObs.add(obstacles.get(i-1));
-                }
-                i--;
-                continue;            //to ensure functionality in the event of 0 forward obstacles given
-            }
-            if (obstacles.get(i).c.y > c.y){
-                netObs.add(obstacles.get(i));
-            }
-            
-        }
-        //add in invalid after objects
-        while (netObs.size() < NEURAL_NET_OBSTACLES_TOTAL){
-            netObs.add(null);
-        }
-        return netObs;
-    }
-    
-    public void fillRandom(){
-        int obstaclesAdded = 0;
-        for (int i = OBSTACLES_Y_START; i < OBSTACLES_Y_END; i += OBSTACLES_INTERVAL, obstaclesAdded++){
-            obstacles.add(new Obstacle(
-            /*
-             * excessively long conditional behavior as follows:
-             * obstaclesAdded > GAP_OBSTACLES : (r.nextInt(RIGHT_LINE_X - LEFT_LINE_X) + LEFT_LINE_X)
-             * obstaclesAdded == GAP_OBSTACLES : (LEFT_LINE_X + RIGHT_LINE_X) / 2.0
-             * obstaclesAdded < GAP_OBSTACLES : r.nextInt((RIGHT_LINE_X - LEFT_LINE_X - GAP_WIDTH) / 2) + LEFT_LINE_X + ((RIGHT_LINE_X - LEFT_LINE_X - GAP_WIDTH) / 2 + GAP_WIDTH) * r.nextInt(1)
-             */
-            obstaclesAdded > 2 ? (r.nextInt(RIGHT_LINE_X - LEFT_LINE_X) + LEFT_LINE_X) : obstaclesAdded == 2 ? (LEFT_LINE_X + RIGHT_LINE_X) / 2.0 : r.nextInt((RIGHT_LINE_X - LEFT_LINE_X - GAP_WIDTH) / 2) + LEFT_LINE_X + ((RIGHT_LINE_X - LEFT_LINE_X - GAP_WIDTH) / 2 + GAP_WIDTH) * r.nextInt(2),
-            r.nextInt(OBSTACLES_INTERVAL) + i,
-            r.nextInt(OBSTACLES_SIZE_RANGE) + OBSTACLES_MIN_SIZE));
-        }
     }
 }
 
@@ -374,8 +302,10 @@ class Player {
         boolean grabbed = false;        //wheither the player tries to grab on to anything
         if (net != null){
             setNetworkInput();
-            //System.out.println(net.getOutput());
-            if (net.getOutput().get(0) > .8){
+            if (isRunning) {
+                //System.out.println(net.getOutput());
+            }
+            if (net.getOutput().get(0) > .8){        //it seems as though the net output is never > .8
                 grab(world.getClosestObstacle(c));
                 grabbed = true;
             } else {
@@ -544,6 +474,83 @@ class Player {
         }
     }
 }
+
+class World {
+    public ArrayList<Obstacle> obstacles;
+    public boolean drawn;
+
+    public World() {
+        obstacles = new ArrayList();
+        drawn = false;
+    }
+
+    public void addObstacle(Obstacle o) {        //assumes that obstacles are added in sorted order
+        obstacles.add(o);
+    }
+    
+    public Obstacle getClosestObstacle(Coordinate coord){
+         return getClosestObstacles(coord).get(0);
+    }
+    
+    public ArrayList<Obstacle> getClosestObstacles(Coordinate coord){
+        ArrayList<Obstacle> obsArray = new ArrayList(obstacles);
+         final Coordinate c = coord;
+         Collections.sort(obsArray, new Comparator<Obstacle>() {
+             public int compare(Obstacle o1, Obstacle o2) {
+                 return o1.distanceTo(c) < o2.distanceTo(c) ? -1 : o1.distanceTo(c) == o2.distanceTo(c) ? 0 : 1;
+             }
+         });
+         return obsArray;
+    }
+    
+    //gets the relevant obstacles for a given coordinate
+    //the obstacle before and the four after the given location
+    //if any of these don't exist, the value at that index will be null
+    public ArrayList<Obstacle> getNetObstacles(Coordinate c) {
+        ArrayList<Obstacle> netObs = new ArrayList();
+        //add in valid after objects and before object, valid or not
+        for (int i = 0; i < obstacles.size(); i++) {
+            if (netObs.size() == NEURAL_NET_OBSTACLES_TOTAL) {
+                break;
+            }
+            if (obstacles.get(i).c.y > c.y && netObs.size() == 0) {
+                if (i == 0){
+                    netObs.add(null);
+                } else {
+                    netObs.add(obstacles.get(i-1));
+                }
+                i--;
+                continue;            //to ensure functionality in the event of 0 forward obstacles given
+            }
+            if (obstacles.get(i).c.y > c.y){
+                netObs.add(obstacles.get(i));
+            }
+            
+        }
+        //add in invalid after objects
+        while (netObs.size() < NEURAL_NET_OBSTACLES_TOTAL){
+            netObs.add(null);
+        }
+        return netObs;
+    }
+    
+    public void fillRandom(){
+        int obstaclesAdded = 0;
+        for (int i = OBSTACLES_Y_START; i < OBSTACLES_Y_END; i += OBSTACLES_INTERVAL, obstaclesAdded++){
+            obstacles.add(new Obstacle(
+            /*
+             * excessively long conditional behavior as follows:
+             * obstaclesAdded > GAP_OBSTACLES : (r.nextInt(RIGHT_LINE_X - LEFT_LINE_X) + LEFT_LINE_X)
+             * obstaclesAdded == GAP_OBSTACLES : (LEFT_LINE_X + RIGHT_LINE_X) / 2.0
+             * obstaclesAdded < GAP_OBSTACLES : r.nextInt((RIGHT_LINE_X - LEFT_LINE_X - GAP_WIDTH) / 2) + LEFT_LINE_X + ((RIGHT_LINE_X - LEFT_LINE_X - GAP_WIDTH) / 2 + GAP_WIDTH) * r.nextInt(1)
+             */
+            obstaclesAdded > 2 ? (r.nextInt(RIGHT_LINE_X - LEFT_LINE_X) + LEFT_LINE_X) : obstaclesAdded == 2 ? (LEFT_LINE_X + RIGHT_LINE_X) / 2.0 : r.nextInt((RIGHT_LINE_X - LEFT_LINE_X - GAP_WIDTH) / 2) + LEFT_LINE_X + ((RIGHT_LINE_X - LEFT_LINE_X - GAP_WIDTH) / 2 + GAP_WIDTH) * r.nextInt(2),
+            r.nextInt(OBSTACLES_INTERVAL) + i,
+            r.nextInt(OBSTACLES_SIZE_RANGE) + OBSTACLES_MIN_SIZE));
+        }
+    }
+}
+
 
 class Obstacle {
     public Coordinate c;
