@@ -171,13 +171,17 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
     static final int MAXIMUM_FITNESS = WORLD_LENGTH * TEST_WORLDS_SIZE;
     
     double evaluate (Organism o, NeuralNetwork nn) {
-        int netScore = 0;
+        int netScore = 1;
         for (World world : worlds){
             Player player = new Player(INITIAL_PLAYER_X, INITIAL_PLAYER_Y, radians(INITIAL_PLAYER_ANGLE));
             player.world = world;
-            netScore += runPlayer(player).score;        //TODO: more advanced calculation of fitness
+            //netScore += runPlayer(player).score;        //TODO: more advanced calculation of fitness
+            RunResults results = runPlayer(player);
+            if (results.turnsGrabbed != 0 && results.turnsNotGrabbed != 0){
+                netScore += results.score;
+            }
         }
-        //System.out.println("Score: " + netScore + "  Hash: " + netToString(nn).hashCode());
+        System.out.println("Score: " + netScore + "  Hash: " + netToString(nn).hashCode());
         return (double)netScore;
     }
 }
@@ -341,12 +345,13 @@ class Player {
     //Handles one tick of movement for the player, including dying and grabbedLast;
     //returns if the player successfully grabbed a target
     public boolean handleMove(){
-        boolean grabbed = false;
+        boolean grabbed = false;        //wheither the player tries to grab on to anything
         if (net != null){
             setNetworkInput();
             //System.out.println(net.getOutput());
             if (net.getOutput().get(0) > .8){
-                grabbed = grab(world.getClosestObstacle(c));
+                grab(world.getClosestObstacle(c));
+                grabbed = true;
             } else {
                 unGrab();
             }
@@ -356,7 +361,7 @@ class Player {
         if (checkCrash() || c.y > WORLD_LENGTH){
             die();
         }
-        if (grabTarget == null){
+        if (grabTarget == null){        //wheither the player successfully attempted to grab on to anything
             grabbedLast = false;
         } else {
             grabbedLast = true;
@@ -365,12 +370,10 @@ class Player {
     }
 
     //returns if successfully grabbed target
-    public boolean grab(Obstacle target) {
+    public void grab(Obstacle target) {
         if (compareAngle(target)){
              grabTarget = target;
-             return true;
         }
-        return false;
     }
 
     public void unGrab() {
