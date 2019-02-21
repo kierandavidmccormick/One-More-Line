@@ -37,8 +37,8 @@ static final int TEST_WORLDS_SIZE = 5;
 final int NEURAL_NET_OBSTACLES_BEFORE = 1;        //number of obstacles with y <= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_TOTAL = NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER;
-final int POPULATION_SIZE = 10;
-final int GENERATIONS_COUNT_MAX = 10;
+final int POPULATION_SIZE = 100;
+final int GENERATIONS_COUNT_MAX = 100;
 final double NEURONS_SIGMOID_SLOPE = .2;
 final int MAXIMUM_SIMULATION_TURNS = (int)((WORLD_LENGTH / PLAYER_SPEED) * 4.0);
 final int DEFAULT_BACKGROUND_COLOR = 200;
@@ -190,7 +190,7 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
             player.net = nn;
             RunResults results = runPlayer(player);
             if (results.turns > MAXIMUM_SIMULATION_TURNS){
-                System.out.println("KILLED FOR EXCESS TIME");
+                //System.out.println("KILLED FOR EXCESS TIME");
                 return 1;    //I do not take kindly to mere AI wasting my valuable time
             }
             if (results.turnsGrabbed != 0 && results.turnsNotGrabbed != 0){
@@ -199,7 +199,7 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
                 //System.out.println("Turns Taken: " + results.turns + ", Turns Grabbed: " + results.turnsGrabbed + ", Turns Not: " + results.turnsNotGrabbed);
             }
         }
-        System.out.println("Score: " + netScore + "  Hash: " + netToString(nn).hashCode());
+        //System.out.println("Score: " + netScore + "  Hash: " + netToString(nn).hashCode());
         return (double)netScore;
     }
 }
@@ -306,8 +306,7 @@ class Player {
                 //System.out.println(net.getOutput());
             }
             if (net.getOutput().get(0) > .8){        //it seems as though the net output is never > .8
-                grab(world.getClosestObstacle(c));
-                grabbed = true;
+                grabbed = grab(world.getClosestObstacle(c));
             } else {
                 unGrab();
             }
@@ -326,10 +325,12 @@ class Player {
     }
 
     //returns if successfully grabbed target
-    public void grab(Obstacle target) {
+    public boolean grab(Obstacle target) {
         if (compareAngle(target)){
              grabTarget = target;
+             return true;
         }
+        return false;
     }
 
     public void unGrab() {
