@@ -15,8 +15,9 @@ Random r;
 ArrayList<World> worlds;
 boolean isRunning;
 int worldIndex;
+int gfxOffset;
 
-static final int WORLD_LENGTH = 1000;
+static final int WORLD_LENGTH = 10000;
 final int WORLD_WIDTH = 500;
 final int INITIAL_PLAYER_ANGLE = 90;
 final int INITIAL_PLAYER_X = 250;
@@ -37,11 +38,14 @@ static final int TEST_WORLDS_SIZE = 5;
 final int NEURAL_NET_OBSTACLES_BEFORE = 1;        //number of obstacles with y <= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_TOTAL = NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER;
-final int POPULATION_SIZE = 100;
-final int GENERATIONS_COUNT_MAX = 100;
+final int POPULATION_SIZE = 10;
+final int GENERATIONS_COUNT_MAX = 10;
 final double NEURONS_SIGMOID_SLOPE = .2;
 final int MAXIMUM_SIMULATION_TURNS = (int)((WORLD_LENGTH / PLAYER_SPEED) * 4.0);
 final int DEFAULT_BACKGROUND_COLOR = 200;
+
+final boolean MANUAL_CONTROL = true;
+final boolean NOCLIP = true;
 
 void setup() {
     isRunning = false;
@@ -52,11 +56,13 @@ void setup() {
     size(500, 1000);                        //REMEMBER TO RESET THIS
     player = new Player(0, 0, 0);            //these get overwritten anyways
     initWorlds();
-    try {
-       player.net = trainNet();
-       System.out.println(netToString(player.net));
-    } catch (Exception e) {
-        System.err.println(e.getMessage());
+    if (!MANUAL_CONTROL){
+        try {
+           player.net = trainNet();
+           System.out.println(netToString(player.net));
+        } catch (Exception e) {
+            System.err.println(e.getMessage());
+        }
     }
     worlds.get(0).drawn = true;
     setupWorld(worlds.get(0));
@@ -81,11 +87,17 @@ void draw() {
 void setupWorld(World w){
     player.resetPlayer(INITIAL_PLAYER_X, INITIAL_PLAYER_Y, radians(INITIAL_PLAYER_ANGLE));
     player.world = w;
+    gfxOffset = 0;
+    setupGfx(w, gfxOffset);
+}
+
+void setupGfx(World w, int offset){
     background(DEFAULT_BACKGROUND_COLOR);
     line(LEFT_LINE_X, 0, LEFT_LINE_X, WORLD_LENGTH);
     line(RIGHT_LINE_X, 0, RIGHT_LINE_X, WORLD_LENGTH);
+    text("World: " + worldIndex + "\nOffset: " + gfxOffset, 10, 10);
     for (Obstacle o : w.obstacles) {
-        o.drawObstacle();
+        o.drawObstacle(offset);
     }
 }
 
@@ -108,6 +120,12 @@ void initWorlds(){
         w.fillRandom();
         worlds.add(w);
     }
+}
+
+void resetView(World w) {
+    System.out.println("RESETTING");
+    gfxOffset += 1000;
+    setupGfx(w, gfxOffset);
 }
 
 NeuralNetwork trainNet() throws PersistenceException{
@@ -313,13 +331,17 @@ class Player {
         }
         move();
         drawPlayer();
-        if (checkCrash() || c.y > WORLD_LENGTH || turnCount > MAXIMUM_SIMULATION_TURNS){
+        if ((checkCrash() && !NOCLIP) || c.y > WORLD_LENGTH || turnCount > MAXIMUM_SIMULATION_TURNS){
             die();
+            return grabbed;
         }
         if (grabTarget == null){        //wheither the player successfully attempted to grab on to anything
             grabbedLast = false;
         } else {
             grabbedLast = true;
+        }
+        if (c.y - gfxOffset > 1000) {
+            resetView(world);
         }
         return grabbed;
     }
@@ -347,12 +369,12 @@ class Player {
 
     private boolean checkCrash() {
         if ((c.x < LEFT_LINE_X || c.x > RIGHT_LINE_X || c.y < 0) && grabTarget == null && grabbedLast == false){
-            die();
+            //die();
             return true;   
         }
         for (Obstacle o : world.obstacles) {
             if (o.containsPoint(c, PLAYER_DIAMETER / 2)) {
-                die();
+                //die();
                 return true;
             }
         }
@@ -362,7 +384,7 @@ class Player {
     public void die(){
         if (world.drawn){
             fill(255, 0, 0);
-            ellipse((float)c.x, (float)c.y, PLAYER_DEATH_DIAMETER, PLAYER_DEATH_DIAMETER);
+            ellipse((float)c.x, (float)c.y - gfxOffset, PLAYER_DEATH_DIAMETER, PLAYER_DEATH_DIAMETER);
             fill(255, 255, 255);
         }
         alive = false;
@@ -467,10 +489,10 @@ class Player {
     public void drawPlayer() {
         if (world.drawn){
             if (grabTarget != null){
-                 line((float)c.x, (float)c.y, (float)grabTarget.c.x, (float)grabTarget.c.y);
+                 line((float)c.x, (float)c.y - gfxOffset, (float)grabTarget.c.x, (float)grabTarget.c.y - gfxOffset);
                  fill(200);
             }
-            ellipse((float)c.x, (float)c.y, (float)PLAYER_DIAMETER, (float)PLAYER_DIAMETER);
+            ellipse((float)c.x, (float)c.y - gfxOffset, (float)PLAYER_DIAMETER, (float)PLAYER_DIAMETER);
             fill(255);
         }
     }
@@ -570,8 +592,8 @@ class Obstacle {
         this.diameter = r;
     }
 
-    public void drawObstacle() {
-        ellipse((float)c.x, (float)c.y, (float)diameter, (float)diameter);
+    public void drawObstacle(int offset) {
+        ellipse((float)c.x, (float)c.y - offset, (float)diameter, (float)diameter);
     }
 
     public boolean containsPoint(Coordinate p, double offset) {
