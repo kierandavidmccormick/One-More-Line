@@ -12,7 +12,9 @@ import org.neuroph.contrib.neat.gen.impl.SimpleNeatParameters;
 
 Player player;
 Random r;
-ArrayList<World> worlds;
+//ArrayList<World> worlds;
+ArrayList<World> trainWorlds;
+ArrayList<World> testWorlds;
 boolean isRunning;
 int worldIndex;
 int gfxOffset;
@@ -34,18 +36,20 @@ final int OBSTACLES_SIZE_RANGE = 10;
 final double PLAYER_SPEED = 3.0;
 final double PLAYER_DIAMETER = 6.0;
 final float PLAYER_DEATH_DIAMETER = 20.0;
-static final int TEST_WORLDS_SIZE = 5;
+static final int TRAIN_WORLDS_SIZE = 5;
+static final int TEST_WORLDS_SIZE = 5 + TRAIN_WORLDS_SIZE;
 final int NEURAL_NET_OBSTACLES_BEFORE = 1;        //number of obstacles with y <= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_TOTAL = NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER;
-final int POPULATION_SIZE = 10;
-final int GENERATIONS_COUNT_MAX = 10;
+final int POPULATION_SIZE = 100;
+final int GENERATIONS_COUNT_MAX = 1000;
 final double NEURONS_SIGMOID_SLOPE = .2;
 final int MAXIMUM_SIMULATION_TURNS = (int)((WORLD_LENGTH / PLAYER_SPEED) * 4.0);
 final int DEFAULT_BACKGROUND_COLOR = 200;
 
-final boolean MANUAL_CONTROL = true;
-final boolean NOCLIP = true;
+final boolean MANUAL_CONTROL = false;
+final boolean NOCLIP = false;
+final boolean PRINT_NET_OUTPUT = true;
 
 void setup() {
 	isRunning = false;
@@ -65,8 +69,8 @@ void setup() {
 			System.err.println(e.getMessage());
 		}
 	}
-	worlds.get(0).drawn = true;
-	setupWorld(worlds.get(0));
+	testWorlds.get(0).drawn = true;
+	setupWorld(testWorlds.get(0));
 	isRunning = true;
 }
 
@@ -77,12 +81,16 @@ void draw() {
 	player.handleMove(0);
 	if (!player.alive) {
 		delay(100);
-		worlds.get(worldIndex).drawn = false;
-		worldIndex +=1;
-		worldIndex %= TEST_WORLDS_SIZE;
-		worlds.get(worldIndex).drawn = true;
-		setupWorld(worlds.get(worldIndex));
+		nextWorld();
 	}
+}
+
+void nextWorld() {
+    testWorlds.get(worldIndex).drawn = false;
+    worldIndex +=1;
+    worldIndex %= TEST_WORLDS_SIZE;
+    testWorlds.get(worldIndex).drawn = true;
+    setupWorld(testWorlds.get(worldIndex));
 }
 
 void setupWorld(World w) {
@@ -103,28 +111,37 @@ void setupGfx(World w, int offset) {
 }
 
 void mousePressed() {
-	if (player != null) {
+    nextWorld();
+	if (player != null && MANUAL_CONTROL) {
 		player.grab(player.world.getClosestObstacle(player.c));
 	}
 }
 
 void mouseReleased() {
-	if (player != null) {
+	if (player != null && MANUAL_CONTROL) {
 		player.unGrab();
 	}
 }
 
 void initWorlds() {
-	worlds = new ArrayList();
-	for (int i = 0; i < TEST_WORLDS_SIZE; i++) {
+	trainWorlds = new ArrayList();
+	for (int i = 0; i < TRAIN_WORLDS_SIZE; i++) {
 		World w = new World();
 		w.fillRandom();
-		worlds.add(w);
+		trainWorlds.add(w);
 	}
+	testWorlds = new ArrayList(trainWorlds);
+	for (int i = 0; i < TEST_WORLDS_SIZE - TRAIN_WORLDS_SIZE; i++) {
+        World w = new World();
+        w.fillRandom();
+        testWorlds.add(w);
+    }
 }
 
 void resetView(World w) {
-	System.out.println("RESETTING");
+    if (isRunning) {
+		System.out.println("RESETTING");
+    }
 	gfxOffset += 1000;
 	setupGfx(w, gfxOffset);
 }
@@ -204,7 +221,7 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
 
 	double evaluate (Organism o, NeuralNetwork nn) {
 		int netScore = 1;        //NOTE: This will break if the net score == zero, and probably if it is > 0.
-		for (World world : worlds) {
+		for (World world : trainWorlds) {
 			Player player = new Player(INITIAL_PLAYER_X, INITIAL_PLAYER_Y, radians(INITIAL_PLAYER_ANGLE));
 			player.world = world;
 			player.net = nn;
@@ -322,8 +339,8 @@ class Player {
 		boolean grabbed = false;        //wheither the player tries to grab on to anything
 		if (net != null) {
 			setNetworkInput();
-			if (isRunning) {
-				//System.out.println(net.getOutput());
+			if (isRunning && PRINT_NET_OUTPUT) {
+				System.out.println(net.getOutput());
 			}
 			if (net.getOutput().get(0) > .8) {        //it seems as though the net output is never > .8
 				grabbed = grab(world.getClosestObstacle(c));
