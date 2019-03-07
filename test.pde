@@ -41,6 +41,7 @@ static final int TEST_WORLDS_SIZE = 5 + TRAIN_WORLDS_SIZE;
 final int NEURAL_NET_OBSTACLES_BEFORE = 1;        //number of obstacles with y <= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_TOTAL = NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER;
+final double NEURAL_NET_GRAB_THRESHOLD = .8;
 final int POPULATION_SIZE = 100;
 final int GENERATIONS_COUNT_MAX = 1000;
 final double NEURONS_SIGMOID_SLOPE = .2;
@@ -342,7 +343,7 @@ class Player {
 			if (isRunning && PRINT_NET_OUTPUT) {
 				System.out.println(net.getOutput());
 			}
-			if (net.getOutput().get(0) > .8) {        //it seems as though the net output is never > .8
+			if (net.getOutput().get(0) > NEURAL_NET_GRAB_THRESHOLD) {        //it seems as though the net output is never > .8
 				grabbed = grab(world.getClosestObstacle(c));
 			} else {
 				unGrab();
@@ -354,7 +355,7 @@ class Player {
 			die();
 			return grabbed;
 		}
-		if (grabTarget == null) {        //wheither the player successfully attempted to grab on to anything
+		if (grabTarget == null) {        //whether the player successfully attempted to grab on to anything
 			grabbedLast = false;
 		} else {
 			grabbedLast = true;
@@ -509,8 +510,10 @@ class Player {
 		if (world.drawn) {
 			if (grabTarget != null) {
 				line((float)c.x, (float)c.y - gfxOffset, (float)grabTarget.c.x, (float)grabTarget.c.y - gfxOffset);
-				fill(200);
-			}
+				fill(50);
+			} else if (net != null && net.getOutput().get(0) > NEURAL_NET_GRAB_THRESHOLD) {
+    			fill(150);
+    		}
 			ellipse((float)c.x, (float)c.y - gfxOffset, (float)PLAYER_DIAMETER, (float)PLAYER_DIAMETER);
 			fill(255);
 		}
