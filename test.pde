@@ -20,12 +20,12 @@ int worldIndex;
 int gfxOffset;
 
 static final int WORLD_LENGTH = 10000;
-final int WORLD_WIDTH = 500;
+final int WORLD_WIDTH = 800;
 final int INITIAL_PLAYER_ANGLE = 90;
-final int INITIAL_PLAYER_X = 250;
+final int INITIAL_PLAYER_X = 150;
 final int INITIAL_PLAYER_Y = 50;
-final int LEFT_LINE_X = 200;
-final int RIGHT_LINE_X = 300;
+final int LEFT_LINE_X = 100;
+final int RIGHT_LINE_X = 200;
 final int OBSTACLES_Y_START = 100;
 final int OBSTACLES_Y_END = WORLD_LENGTH;
 final int GAP_OBSTACLES = 2;
@@ -42,8 +42,8 @@ final int NEURAL_NET_OBSTACLES_BEFORE = 1;        //number of obstacles with y <
 final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_TOTAL = NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER;
 final double NEURAL_NET_GRAB_THRESHOLD = .8;
-final int POPULATION_SIZE = 100;
-final int GENERATIONS_COUNT_MAX = 100;
+final int POPULATION_SIZE = 10;
+final int GENERATIONS_COUNT_MAX = 10;
 final double NEURONS_SIGMOID_SLOPE = .2;
 final int MAXIMUM_SIMULATION_TURNS = (int)((WORLD_LENGTH / PLAYER_SPEED) * 4.0);
 final int DEFAULT_BACKGROUND_COLOR = 200;
@@ -65,7 +65,7 @@ void setup() {
 	System.out.println("START");
 	r = new Random();
 	//size(WORLD_WIDTH, WORLD_LENGTH);
-	size(500, 1000);                        //REMEMBER TO RESET THIS
+	size(800, 1000);                        //REMEMBER TO RESET THIS
 	player = new Player(0, 0, 0);            //these get overwritten anyways
 	initWorlds();
 	if (!MANUAL_CONTROL) {
