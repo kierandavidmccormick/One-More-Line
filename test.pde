@@ -43,7 +43,7 @@ final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >=
 final int NEURAL_NET_OBSTACLES_TOTAL = NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER;
 final double NEURAL_NET_GRAB_THRESHOLD = .8;
 final int POPULATION_SIZE = 100;
-final int GENERATIONS_COUNT_MAX = 1000;
+final int GENERATIONS_COUNT_MAX = 100;
 final double NEURONS_SIGMOID_SLOPE = .2;
 final int MAXIMUM_SIMULATION_TURNS = (int)((WORLD_LENGTH / PLAYER_SPEED) * 4.0);
 final int DEFAULT_BACKGROUND_COLOR = 200;
@@ -52,8 +52,15 @@ final boolean MANUAL_CONTROL = false;
 final boolean NOCLIP = false;
 final boolean PRINT_NET_OUTPUT = true;
 
+//tracking for generation-based statistics
+double globalMaxFitness;
+double[] localMaxFitness;
+int playersSinceGeneration;
+int generation;
+
 void setup() {
 	isRunning = false;
+	localMaxFitness = new double[GENERATIONS_COUNT_MAX];
 	worldIndex = 0;
 	System.out.println("START");
 	r = new Random();
@@ -72,6 +79,11 @@ void setup() {
 	}
 	testWorlds.get(0).drawn = true;
 	setupWorld(testWorlds.get(0));
+	System.out.println("MAX SCORE: " + globalMaxFitness);
+	System.out.println("LOCAL_SCORES: ");
+	for (int i = 0; i < localMaxFitness.length; i++) {
+    	System.out.println("GEN: " + i + ", SCORE: " + localMaxFitness[i]);
+	}
 	isRunning = true;
 }
 
@@ -216,6 +228,19 @@ String netToString(NeuralNetwork network) {
 	return outString;
 }
 
+void updateGenInfo(double fitness) {
+    playersSinceGeneration++;
+    if (playersSinceGeneration == GENERATIONS_COUNT_MAX) {
+        playersSinceGeneration = 0;
+        generation++;
+    }
+    if (fitness > globalMaxFitness) {
+        globalMaxFitness = fitness;
+    }
+    if (fitness > localMaxFitness[generation]) {
+        localMaxFitness[generation] = fitness;
+    }
+}
 
 class OMLFitnessFunction extends AbstractFitnessFunction {
 	static final int MAXIMUM_FITNESS = WORLD_LENGTH * TEST_WORLDS_SIZE;
@@ -238,7 +263,8 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
 			}
 		}
 		//System.out.println("Score: " + netScore + "  Hash: " + netToString(nn).hashCode());
-		return (double)netScore;
+		updateGenInfo(netScore);
+		return netScore;
 	}
 }
 
