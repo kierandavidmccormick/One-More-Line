@@ -43,14 +43,14 @@ final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >=
 final int NEURAL_NET_OBSTACLES_TOTAL = NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER;
 final double NEURAL_NET_GRAB_THRESHOLD = .8;
 final int POPULATION_SIZE = 100;
-final int GENERATIONS_COUNT_MAX = 100;
+final int GENERATIONS_COUNT_MAX = 1000;
 final double NEURONS_SIGMOID_SLOPE = .2;
 final int MAXIMUM_SIMULATION_TURNS = (int)((WORLD_LENGTH / PLAYER_SPEED) * 4.0);
 final int DEFAULT_BACKGROUND_COLOR = 200;
 
 final boolean MANUAL_CONTROL = false;
 final boolean NOCLIP = false;
-final boolean PRINT_NET_OUTPUT = false;
+final boolean PRINT_NET_OUTPUT = false;;
 
 //tracking for generation-based statistics
 double globalMaxFitness;
@@ -61,7 +61,7 @@ int baseScore;
 
 void setup() {
 	isRunning = false;
-	localMaxFitness = new double[GENERATIONS_COUNT_MAX];
+	localMaxFitness = new double[GENERATIONS_COUNT_MAX * 10];
 	worldIndex = 0;
 	System.out.println("START");
 	r = new Random();
@@ -75,16 +75,21 @@ void setup() {
 			System.out.println(netToString(player.net));
 		} 
 		catch (Exception e) {
+    		System.out.println("ERROR START *****************");
 			System.err.println(e.getMessage());
+			System.err.println(Arrays.deepToString(e.getStackTrace()));
+			System.out.println("ERROR END *******************");
 		}
 	}
 	testWorlds.get(0).drawn = true;
 	setupWorld(testWorlds.get(0));
+	/*
 	System.out.println("MAX SCORE: " + globalMaxFitness);
 	System.out.println("LOCAL SCORES: ");
 	for (int i = 0; i < localMaxFitness.length; i++) {
     	System.out.println("GEN: " + i + ", SCORE: " + localMaxFitness[i]);
 	}
+	*/
 	System.out.println("BASE SCORE: " + baseScore);
 	isRunning = true;
 }
@@ -201,8 +206,10 @@ NeuralNetwork trainNet() throws PersistenceException {
 		evolver = Evolver.createNew(params, inputGenes, outputGenes);
 	} 
 	catch (Exception e) {
-		System.out.println(e.getMessage());
-		e.printStackTrace();
+		System.out.println("ERROR START *****************");
+        System.err.println(e.getMessage());
+        System.err.println(Arrays.deepToString(e.getStackTrace()));
+        System.out.println("ERROR END *******************");
 	}
 	Organism best = evolver.evolve();
 
@@ -246,11 +253,11 @@ String netToString(NeuralNetwork network) {
 }
 
 void updateGenInfo(double fitness) {
-    playersSinceGeneration++;
-    if (playersSinceGeneration == GENERATIONS_COUNT_MAX) {
+    if (playersSinceGeneration == POPULATION_SIZE) {
         playersSinceGeneration = 0;
         generation++;
     }
+    playersSinceGeneration++;
     if (fitness > globalMaxFitness) {
         globalMaxFitness = fitness;
     }
@@ -271,13 +278,13 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
 			RunResults results = runPlayer(player);
 			if (results.turns > MAXIMUM_SIMULATION_TURNS) {
 				//System.out.println("KILLED FOR EXCESS TIME");
-				return 1;    //I do not take kindly to mere AI wasting my valuable time
+				return 1;    //I do not take kindly to mere machines wasting my valuable time
 			}
 			if (results.turnsGrabbed != 0 && results.turnsNotGrabbed != 0) {
 				netScore += results.score;
-				System.out.println("********************");
+				//System.out.println("********************");
 			} else {
-				System.out.println("Turns Taken: " + results.turns + ", Turns Grabbed: " + results.turnsGrabbed + ", Turns Not: " + results.turnsNotGrabbed);
+				//System.out.println("Turns Taken: " + results.turns + ", Turns Grabbed: " + results.turnsGrabbed + ", Turns Not: " + results.turnsNotGrabbed);
 			}
 		}
 		//System.out.println("Score: " + netScore + "  Hash: " + netToString(nn).hashCode());
@@ -290,13 +297,18 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
 RunResults runPlayer(Player player) {
 	int turnsTaken = 0;
 	int turnsGrabbed = 0;
+	int turnsIdle = 0;
 	while (player.alive) {
-		if (player.handleMove(turnsTaken)) {
-			turnsGrabbed++;
-		}
-		turnsTaken++;
+		MoveResults mvr = player.handleMove(turnsTaken);
+		if (mvr.grabbed) {
+    		turnsGrabbed++;
+    	}
+    	if (mvr.idle) {
+        	turnsIdle++;
+    	}
+    	turnsTaken++;
 	}
-	return new RunResults(turnsTaken, turnsGrabbed, turnsTaken - turnsGrabbed, player.c.y);
+	return new RunResults(turnsTaken, turnsGrabbed, turnsIdle, player.c.y);
 }
 
 class RunResults {
@@ -311,6 +323,17 @@ class RunResults {
 		this.turnsNotGrabbed = turnsNotGrabbed;
 		this.score = score;
 	}
+}
+
+class MoveResults {
+    public boolean grabbed;
+    public boolean idle;
+
+	public MoveResults(boolean grabbed, boolean idle) {
+    	this.grabbed = grabbed;
+    	this.idle = idle;
+	}
+
 }
 
 class Player {
@@ -380,15 +403,17 @@ class Player {
 
 	//Handles one tick of movement for the player, including dying and grabbedLast;
 	//returns if the player successfully grabbed a target
-	public boolean handleMove(int turnCount) {
-		boolean grabbed = false;        //wheither the player tries to grab on to anything
+	public MoveResults handleMove(int turnCount) {
+		boolean grabbed = false;        //wheither the player grabs on to anything
+		boolean idle = true;			//wheither the player attempts to grab on to anything
 		if (net != null) {
 			setNetworkInput();
 			if (isRunning && PRINT_NET_OUTPUT) {
 				System.out.println(net.getOutput());
 			}
-			if (net.getOutput().get(0) > NEURAL_NET_GRAB_THRESHOLD) {        //it seems as though the net output is never > .8
+			if (net.getOutput().get(0) > NEURAL_NET_GRAB_THRESHOLD) {
 				grabbed = grab(world.getClosestObstacle(c));
+				idle = false;
 			} else {
 				unGrab();
 			}
@@ -397,7 +422,7 @@ class Player {
 		drawPlayer();
 		if ((checkCrash() && !NOCLIP) || c.y > WORLD_LENGTH || turnCount > MAXIMUM_SIMULATION_TURNS) {
 			die();
-			return grabbed;
+			return new MoveResults(grabbed, idle);
 		}
 		if (grabTarget == null) {        //whether the player successfully attempted to grab on to anything
 			grabbedLast = false;
@@ -407,7 +432,7 @@ class Player {
 		if (c.y - gfxOffset > 1000) {
 			resetView(world);
 		}
-		return grabbed;
+		return new MoveResults(grabbed, idle);
 	}
 
 	//returns if successfully grabbed target
@@ -637,9 +662,8 @@ class World {
 			r.nextInt(OBSTACLES_INTERVAL) + i, 
 			r.nextInt(OBSTACLES_SIZE_RANGE) + OBSTACLES_MIN_SIZE));
 			if (obstaclesAdded == GAP_OBSTACLES && trainWorld) {
-    			System.out.println("AAAAAAAA");
     			Obstacle ob = obstacles.get(GAP_OBSTACLES);
-    			baseScore += ob.c.y - ob.diameter / 2 - PLAYER_DIAMETER / 2;
+    			baseScore += ob.c.y;
     			
     		}
 		}
