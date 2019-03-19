@@ -42,8 +42,8 @@ final int NEURAL_NET_OBSTACLES_BEFORE = 1;        //number of obstacles with y <
 final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_TOTAL = NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER;
 final double NEURAL_NET_GRAB_THRESHOLD = .8;
-final int POPULATION_SIZE = 1000;
-final int GENERATIONS_COUNT_MAX = 10000;
+final int POPULATION_SIZE = 10;
+final int GENERATIONS_COUNT_MAX = 100;
 final double NEURONS_SIGMOID_SLOPE = .2;
 final int MAXIMUM_SIMULATION_TURNS = (int)((WORLD_LENGTH / PLAYER_SPEED) * 4.0);
 final int DEFAULT_BACKGROUND_COLOR = 200;
@@ -293,7 +293,7 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
 		if (hasIdled) {
     		netScore *= .75;
     	}
-    	if (netScore > 1) {
+    	if (netScore < 1) {
         	netScore = 1;
     	}
 		updateGenInfo(netScore);
