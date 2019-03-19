@@ -42,8 +42,8 @@ final int NEURAL_NET_OBSTACLES_BEFORE = 1;        //number of obstacles with y <
 final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_TOTAL = NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER;
 final double NEURAL_NET_GRAB_THRESHOLD = .8;
-final int POPULATION_SIZE = 100;
-final int GENERATIONS_COUNT_MAX = 1000;
+final int POPULATION_SIZE = 1000;
+final int GENERATIONS_COUNT_MAX = 10000;
 final double NEURONS_SIGMOID_SLOPE = .2;
 final int MAXIMUM_SIMULATION_TURNS = (int)((WORLD_LENGTH / PLAYER_SPEED) * 4.0);
 final int DEFAULT_BACKGROUND_COLOR = 200;
@@ -271,6 +271,7 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
 
 	double evaluate (Organism o, NeuralNetwork nn) {
 		int netScore = 1;        //NOTE: This will break if the net score == zero, and probably if it is > 0.
+		boolean hasIdled = false;
 		for (World world : trainWorlds) {
 			Player player = new Player(INITIAL_PLAYER_X, INITIAL_PLAYER_Y, radians(INITIAL_PLAYER_ANGLE));
 			player.world = world;
@@ -284,10 +285,17 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
 				netScore += results.score;
 				//System.out.println("********************");
 			} else {
+    			hasIdled = true;
 				//System.out.println("Turns Taken: " + results.turns + ", Turns Grabbed: " + results.turnsGrabbed + ", Turns Not: " + results.turnsNotGrabbed);
 			}
 		}
 		//System.out.println("Score: " + netScore + "  Hash: " + netToString(nn).hashCode());
+		if (hasIdled) {
+    		netScore *= .75;
+    	}
+    	if (netScore > 1) {
+        	netScore = 1;
+    	}
 		updateGenInfo(netScore);
 		return netScore;
 	}
