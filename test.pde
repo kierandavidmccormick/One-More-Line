@@ -21,11 +21,12 @@ int gfxOffset;
 
 static final int WORLD_LENGTH = 10000;
 final int WORLD_WIDTH = 800;
+final int WORLD_SECTION_LENGTH = 1000;
 final int INITIAL_PLAYER_ANGLE = 90;
-final int INITIAL_PLAYER_X = 150;
-final int INITIAL_PLAYER_Y = 50;
 final int LEFT_LINE_X = 100;
 final int RIGHT_LINE_X = 200;
+final int INITIAL_PLAYER_X = (LEFT_LINE_X + RIGHT_LINE_X) / 2;
+final int INITIAL_PLAYER_Y = 50;
 final int OBSTACLES_Y_START = 100;
 final int OBSTACLES_Y_END = WORLD_LENGTH;
 final int GAP_OBSTACLES = 2;
@@ -36,21 +37,41 @@ final int OBSTACLES_SIZE_RANGE = 10;
 final double PLAYER_SPEED = 3.0;
 final double PLAYER_DIAMETER = 6.0;
 final float PLAYER_DEATH_DIAMETER = 20.0;
-static final int TRAIN_WORLDS_SIZE = 5;
+static final int TRAIN_WORLDS_SIZE = 10;
 static final int TEST_WORLDS_SIZE = 5 + TRAIN_WORLDS_SIZE;
 final int NEURAL_NET_OBSTACLES_BEFORE = 1;        //number of obstacles with y <= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_TOTAL = NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER;
+final int NEURAL_NET_VALUES_PER_OBSTACLE = 3;
+final int NEURAL_NET_OTHER_VALUES = 3;
+final int NEURAL_NET_TOTAL_VALUES = (NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER) * NEURAL_NET_VALUES_PER_OBSTACLE + NEURAL_NET_OTHER_VALUES;
 final double NEURAL_NET_GRAB_THRESHOLD = .8;
-final int POPULATION_SIZE = 10;
-final int GENERATIONS_COUNT_MAX = 100;
+final float SURVIVAL_RATIO = .5;
+final int POPULATION_SIZE = 1000;
+final int GENERATIONS_COUNT_MAX = 10000;
 final double NEURONS_SIGMOID_SLOPE = .2;
 final int MAXIMUM_SIMULATION_TURNS = (int)((WORLD_LENGTH / PLAYER_SPEED) * 4.0);
 final int DEFAULT_BACKGROUND_COLOR = 200;
+final int VIEW_DELAY_MS = 100;
+final int TEXT_X_OFFSET = 10;
+final int TEXT_Y_OFFSET = 10;
+final int GRAPH_X_START = RIGHT_LINE_X + 100;
+final int GRAPH_Y_START = 0;
+final int GRAPH_HEIGHT = 500;
+final int GRAPH_WIDTH = 500;
+final float IDLE_SCORE_MULTIPLIER = .5;
+final float NULL_OBSTACLE_VALUE = -1000000.0;
+final int PLAYER_COLOR_BLANK = 255;
+final int PLAYER_COLOR_ATTEMPTED_GRAB = 150;
+final int PLAYER_COLOR_SUCCESSFUL_GRAB = 50;
+final int[] DEAD_PLAYER_RGB = {255, 0, 0};
+final int[] BASE_LINE_RGB = {255, 0, 0};
+final int[] TREND_LINE_RGB = {0, 0, 255};
+final int[] BORDER_RGB = {0, 0, 0};
 
 final boolean MANUAL_CONTROL = false;
 final boolean NOCLIP = false;
-final boolean PRINT_NET_OUTPUT = false;;
+final boolean PRINT_NET_OUTPUT = false;
 
 //tracking for generation-based statistics
 double globalMaxFitness;
@@ -61,11 +82,11 @@ int baseScore;
 
 void setup() {
 	isRunning = false;
-	localMaxFitness = new double[GENERATIONS_COUNT_MAX * 10];
+	localMaxFitness = new double[GENERATIONS_COUNT_MAX * 10];		//TODO: fix
 	worldIndex = 0;
 	System.out.println("START");
 	r = new Random();
-	//size(WORLD_WIDTH, WORLD_LENGTH);
+	//size(WORLD_WIDTH, WORLD_SECTION_LENGTH);
 	size(800, 1000);                        //REMEMBER TO RESET THIS
 	player = new Player(0, 0, 0);            //these get overwritten anyways
 	initWorlds();
@@ -100,7 +121,7 @@ void draw() {
 	}
 	player.handleMove(0);
 	if (!player.alive) {
-		delay(100);
+		delay(VIEW_DELAY_MS);
 		nextWorld();
 	}
 }
@@ -122,9 +143,9 @@ void setupWorld(World w) {
 
 void setupGfx(World w, int offset) {
 	background(DEFAULT_BACKGROUND_COLOR);
-	line(LEFT_LINE_X, 0, LEFT_LINE_X, WORLD_LENGTH);
-	line(RIGHT_LINE_X, 0, RIGHT_LINE_X, WORLD_LENGTH);
-	text("World: " + worldIndex + "\nOffset: " + gfxOffset, 10, 10);
+	line(LEFT_LINE_X, 0, LEFT_LINE_X, WORLD_SECTION_LENGTH);
+	line(RIGHT_LINE_X, 0, RIGHT_LINE_X, WORLD_SECTION_LENGTH);
+	text("World: " + worldIndex + "\nOffset: " + gfxOffset, TEXT_X_OFFSET, TEXT_Y_OFFSET);
 	drawGraph();
 	for (Obstacle o : w.obstacles) {
 		o.drawObstacle(offset);
@@ -132,17 +153,17 @@ void setupGfx(World w, int offset) {
 }
 
 void drawGraph() {
-    rect(300, 0, 500, 500);
-    stroke(0, 0, 255);
-    float x = 300.0;
-    float dx = 500.0/(GENERATIONS_COUNT_MAX - 1);
-    float scaleFactor = (float)(500.0/(globalMaxFitness > baseScore ? globalMaxFitness : baseScore));
+    rect(GRAPH_X_START, GRAPH_Y_START, GRAPH_WIDTH, GRAPH_HEIGHT);
+    stroke(TREND_LINE_RGB[0], TREND_LINE_RGB[1], TREND_LINE_RGB[2]);
+    float x = GRAPH_X_START;
+    float dx = GRAPH_WIDTH/(GENERATIONS_COUNT_MAX - 1);
+    float scaleFactor = (float)(GRAPH_HEIGHT/(globalMaxFitness > baseScore ? globalMaxFitness : baseScore));
     for (int i = 1; i < localMaxFitness.length; i++) {
-    	line(x + dx * (i - 1), 500 - (float)localMaxFitness[i-1] * scaleFactor, x + dx * i, 500 - (float)localMaxFitness[i] * scaleFactor);
+    	line(x + dx * (i - 1), GRAPH_HEIGHT - (float)localMaxFitness[i-1] * scaleFactor + GRAPH_Y_START, x + dx * i, GRAPH_HEIGHT - (float)localMaxFitness[i] * scaleFactor + GRAPH_Y_START);
     }
-    stroke(255, 0, 0);
-    line(300, 500 - baseScore * scaleFactor, 800, 500 - baseScore * scaleFactor);
-    stroke(0, 0, 0);
+    stroke(BASE_LINE_RGB[0], BASE_LINE_RGB[1], BASE_LINE_RGB[2]);
+    line(GRAPH_X_START, GRAPH_HEIGHT - baseScore * scaleFactor + GRAPH_Y_START, GRAPH_X_START + GRAPH_WIDTH, GRAPH_HEIGHT - baseScore * scaleFactor + GRAPH_Y_START);
+    stroke(BORDER_RGB[0], BORDER_RGB[1], BORDER_RGB[2]);
 }
 
 void mousePressed() {
@@ -177,7 +198,7 @@ void resetView(World w) {
     if (isRunning) {
 		//System.out.println("RESETTING");
     }
-	gfxOffset += 1000;
+	gfxOffset += WORLD_SECTION_LENGTH;
 	setupGfx(w, gfxOffset);
 }
 
@@ -191,11 +212,11 @@ NeuralNetwork trainNet() throws PersistenceException {
 	NaturalSelectionOrganismSelector selector = new NaturalSelectionOrganismSelector();
 	selector.setKillUnproductiveSpecies(true);
 	selector.setElitismEnabled(true);
-	selector.setSurvivalRatio(.5);
+	selector.setSurvivalRatio(SURVIVAL_RATIO);
 	params.setOrganismSelector(selector);
 
 	ArrayList<NeuronGene> inputGenes = new ArrayList();
-	for (int i = 0; i < NEURAL_NET_OBSTACLES_TOTAL * 3 + 3; i++) {
+	for (int i = 0; i < NEURAL_NET_OBSTACLES_TOTAL * NEURAL_NET_VALUES_PER_OBSTACLE + NEURAL_NET_OTHER_VALUES; i++) {
 		inputGenes.add(new NeuronGene(NeuronType.INPUT, params, NEURONS_SIGMOID_SLOPE));
 	}
 	ArrayList<NeuronGene> outputGenes = new ArrayList();
@@ -232,21 +253,15 @@ String netToString(NeuralNetwork network) {
 	for (Layer layer : network.getLayers()) {
 		for (Neuron neuron : layer.getNeurons()) {
 			outString += "Neuron  " + netMap.get(neuron);
-			//System.out.print("Neuron  " + netMap.get(neuron));
 			if (neuron.getOutConnections().size() != 0) {
 				outString += "  connects to";
-				//System.out.print("  connects to");
 				for (Connection connection : neuron.getOutConnections()) {
 					outString += "  " + netMap.get(connection.getConnectedNeuron()) + "  weight  " + connection.getWeight();
-					//System.out.print("  " + netMap.get(connection.getConnectedNeuron()));
 				}
 			} else {
 				outString += "  Is output";
-				//System.out.print("  Is output");
 			}
-			//outString += "  input function  " + neuron.getInputFunction() + "  transfer function  " + neuron.getTransferFunction();
 			outString += "\n";
-			//System.out.println();
 		}
 	}
 	return outString;
@@ -291,7 +306,7 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
 		}
 		//System.out.println("Score: " + netScore + "  Hash: " + netToString(nn).hashCode());
 		if (hasIdled) {
-    		netScore *= .75;
+    		netScore *= IDLE_SCORE_MULTIPLIER;
     	}
     	if (netScore < 1) {
         	netScore = 1;
@@ -390,21 +405,21 @@ class Player {
 			return;
 		}
 		ArrayList<Obstacle> obstacles = world.getNetObstacles(c);
-		double[] networkInput = new double[NEURAL_NET_OBSTACLES_TOTAL * 3 + 3];
+		double[] networkInput = new double[NEURAL_NET_OBSTACLES_TOTAL * NEURAL_NET_VALUES_PER_OBSTACLE + NEURAL_NET_OTHER_VALUES];
 		for (int i = 0; i < NEURAL_NET_OBSTACLES_TOTAL; i++) {
 			if (obstacles.get(i) != null) {
-				networkInput[i * 3] = obstacles.get(i).c.x - c.x;
-				networkInput[i * 3 + 1] = obstacles.get(i).c.y - c.y;
-				networkInput[i * 3 + 2] = obstacles.get(i).diameter / 2.0;
+				networkInput[i * NEURAL_NET_VALUES_PER_OBSTACLE] = obstacles.get(i).c.x - c.x;
+				networkInput[i * NEURAL_NET_VALUES_PER_OBSTACLE + 1] = obstacles.get(i).c.y - c.y;
+				networkInput[i * NEURAL_NET_VALUES_PER_OBSTACLE + 2] = obstacles.get(i).diameter / 2.0;
 			} else {
-				networkInput[i * 3] = -1000000.0;
-				networkInput[i * 3 + 1] = -100000.0;
-				networkInput[i * 3 + 2] = -100000.0;
+				for (int j = 0; j < NEURAL_NET_VALUES_PER_OBSTACLE; j++) {
+    				networkInput[i * NEURAL_NET_VALUES_PER_OBSTACLE + j] = NULL_OBSTACLE_VALUE;
+    			}
 			}
 		}
-		networkInput[NEURAL_NET_OBSTACLES_TOTAL * 3] = c.x - LEFT_LINE_X;
-		networkInput[NEURAL_NET_OBSTACLES_TOTAL * 3 + 1] = PLAYER_SPEED * sin((float)angle);
-		networkInput[NEURAL_NET_OBSTACLES_TOTAL * 3 + 2] = PLAYER_SPEED * cos((float)angle);
+		networkInput[NEURAL_NET_OBSTACLES_TOTAL * NEURAL_NET_VALUES_PER_OBSTACLE] = c.x - LEFT_LINE_X;
+		networkInput[NEURAL_NET_OBSTACLES_TOTAL * NEURAL_NET_VALUES_PER_OBSTACLE + 1] = PLAYER_SPEED * sin((float)angle);
+		networkInput[NEURAL_NET_OBSTACLES_TOTAL * NEURAL_NET_VALUES_PER_OBSTACLE + 2] = PLAYER_SPEED * cos((float)angle);
 		net.setInput(networkInput);
 		net.calculate();
 	}
@@ -437,7 +452,7 @@ class Player {
 		} else {
 			grabbedLast = true;
 		}
-		if (c.y - gfxOffset > 1000) {
+		if (c.y - gfxOffset > WORLD_SECTION_LENGTH) {
 			resetView(world);
 		}
 		return new MoveResults(grabbed, idle);
@@ -480,9 +495,9 @@ class Player {
 
 	public void die() {
 		if (world.drawn) {
-			fill(255, 0, 0);
+			fill(DEAD_PLAYER_RGB[0], DEAD_PLAYER_RGB[1], DEAD_PLAYER_RGB[2]);
 			ellipse((float)c.x, (float)c.y - gfxOffset, PLAYER_DEATH_DIAMETER, PLAYER_DEATH_DIAMETER);
-			fill(255, 255, 255);
+			fill(PLAYER_COLOR_BLANK, PLAYER_COLOR_BLANK, PLAYER_COLOR_BLANK);
 		}
 		alive = false;
 	}
@@ -587,12 +602,12 @@ class Player {
 		if (world.drawn) {
 			if (grabTarget != null) {
 				line((float)c.x, (float)c.y - gfxOffset, (float)grabTarget.c.x, (float)grabTarget.c.y - gfxOffset);
-				fill(50);
+				fill(PLAYER_COLOR_SUCCESSFUL_GRAB);
 			} else if (net != null && net.getOutput().get(0) > NEURAL_NET_GRAB_THRESHOLD) {
-    			fill(150);
+    			fill(PLAYER_COLOR_ATTEMPTED_GRAB);
     		}
 			ellipse((float)c.x, (float)c.y - gfxOffset, (float)PLAYER_DIAMETER, (float)PLAYER_DIAMETER);
-			fill(255);
+			fill(PLAYER_COLOR_BLANK);
 		}
 	}
 }
