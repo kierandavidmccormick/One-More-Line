@@ -37,7 +37,7 @@ final int OBSTACLES_SIZE_RANGE = 10;
 final double PLAYER_SPEED = 3.0;
 final double PLAYER_DIAMETER = 6.0;
 final float PLAYER_DEATH_DIAMETER = 20.0;
-static final int TRAIN_WORLDS_SIZE = 10;
+static final int TRAIN_WORLDS_SIZE = 5;
 static final int TEST_WORLDS_SIZE = 5 + TRAIN_WORLDS_SIZE;
 final int NEURAL_NET_OBSTACLES_BEFORE = 1;        //number of obstacles with y <= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >= player.c.y given to the nn
@@ -47,8 +47,6 @@ final int NEURAL_NET_OTHER_VALUES = 3;
 final int NEURAL_NET_TOTAL_VALUES = (NEURAL_NET_OBSTACLES_BEFORE + NEURAL_NET_OBSTACLES_AFTER) * NEURAL_NET_VALUES_PER_OBSTACLE + NEURAL_NET_OTHER_VALUES;
 final double NEURAL_NET_GRAB_THRESHOLD = .8;
 final float SURVIVAL_RATIO = .5;
-final int POPULATION_SIZE = 1000;
-final int GENERATIONS_COUNT_MAX = 10000;
 final double NEURONS_SIGMOID_SLOPE = .2;
 final int MAXIMUM_SIMULATION_TURNS = (int)((WORLD_LENGTH / PLAYER_SPEED) * 4.0);
 final int DEFAULT_BACKGROUND_COLOR = 200;
@@ -68,6 +66,9 @@ final int[] DEAD_PLAYER_RGB = {255, 0, 0};
 final int[] BASE_LINE_RGB = {255, 0, 0};
 final int[] TREND_LINE_RGB = {0, 0, 255};
 final int[] BORDER_RGB = {0, 0, 0};
+
+final int POPULATION_SIZE = 1000;
+final int GENERATIONS_COUNT_MAX = 2000;
 
 final boolean MANUAL_CONTROL = false;
 final boolean NOCLIP = false;
@@ -285,11 +286,13 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
 	static final int MAXIMUM_FITNESS = WORLD_LENGTH * TEST_WORLDS_SIZE;
 
 	double evaluate (Organism o, NeuralNetwork nn) {
-		int netScore = 1;        //NOTE: This will break if the net score == zero, and probably if it is > 0.
 		boolean hasIdled = false;
-		for (World world : trainWorlds) {
+		double highestScore = 0;
+		double secondHighestScore = 0;
+		double[] scores = new double[TRAIN_WORLDS_SIZE];
+    	for (int i = 0; i < trainWorlds.size(); i++) {
 			Player player = new Player(INITIAL_PLAYER_X, INITIAL_PLAYER_Y, radians(INITIAL_PLAYER_ANGLE));
-			player.world = world;
+			player.world = trainWorlds.get(i);
 			player.net = nn;
 			RunResults results = runPlayer(player);
 			if (results.turns > MAXIMUM_SIMULATION_TURNS) {
@@ -297,7 +300,14 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
 				return 1;    //I do not take kindly to mere machines wasting my valuable time
 			}
 			if (results.turnsGrabbed != 0 && results.turnsNotGrabbed != 0) {
-				netScore += results.score;
+				//netScore += results.score;
+				scores[i] = results.score;
+				if (scores[i] > highestScore) {
+    				secondHighestScore = highestScore;
+    				highestScore = scores[i];
+    			} else if (scores[i] > secondHighestScore) {
+        			secondHighestScore = scores[i];
+        		}
 				//System.out.println("********************");
 			} else {
     			hasIdled = true;
@@ -305,6 +315,15 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
 			}
 		}
 		//System.out.println("Score: " + netScore + "  Hash: " + netToString(nn).hashCode());
+		int netScore = 1;        //NOTE: This will break if the net score == zero, and probably if it is > 0.
+		for (double score : scores) {
+    		if (score == highestScore && highestScore > secondHighestScore * 2 && TRAIN_WORLDS_SIZE > 1) {
+        		netScore += 2 * secondHighestScore;
+        		//System.out.println("Score limited from " + highestScore + " to " + (secondHighestScore * 2));
+        		continue;
+    		}
+    		netScore += score;
+    	}
 		if (hasIdled) {
     		netScore *= IDLE_SCORE_MULTIPLIER;
     	}
