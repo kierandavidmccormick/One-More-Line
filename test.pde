@@ -37,7 +37,7 @@ final int OBSTACLES_SIZE_RANGE = 10;
 final double PLAYER_SPEED = 3.0;
 final double PLAYER_DIAMETER = 6.0;
 final float PLAYER_DEATH_DIAMETER = 20.0;
-static final int TRAIN_WORLDS_SIZE = 5;
+static final int TRAIN_WORLDS_SIZE = 10;        //It is recommended not to make this too small
 static final int TEST_WORLDS_SIZE = 5 + TRAIN_WORLDS_SIZE;
 final int NEURAL_NET_OBSTACLES_BEFORE = 1;        //number of obstacles with y <= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >= player.c.y given to the nn
@@ -67,8 +67,8 @@ final int[] BASE_LINE_RGB = {255, 0, 0};
 final int[] TREND_LINE_RGB = {0, 0, 255};
 final int[] BORDER_RGB = {0, 0, 0};
 
-final int POPULATION_SIZE = 1000;
-final int GENERATIONS_COUNT_MAX = 2000;
+final int POPULATION_SIZE = 100;
+final int GENERATIONS_COUNT_MAX = 1000;
 
 final boolean MANUAL_CONTROL = false;
 final boolean NOCLIP = false;
@@ -79,7 +79,7 @@ double globalMaxFitness;
 double[] localMaxFitness;
 int playersSinceGeneration;
 int generation;
-int baseScore;
+//int baseScore;
 
 void setup() {
 	isRunning = false;
@@ -112,7 +112,7 @@ void setup() {
     	System.out.println("GEN: " + i + ", SCORE: " + localMaxFitness[i]);
 	}
 	*/
-	System.out.println("BASE SCORE: " + baseScore);
+	//System.out.println("BASE SCORE: " + baseScore);
 	isRunning = true;
 }
 
@@ -158,12 +158,13 @@ void drawGraph() {
     stroke(TREND_LINE_RGB[0], TREND_LINE_RGB[1], TREND_LINE_RGB[2]);
     float x = GRAPH_X_START;
     float dx = GRAPH_WIDTH/(GENERATIONS_COUNT_MAX - 1);
-    float scaleFactor = (float)(GRAPH_HEIGHT/(globalMaxFitness > baseScore ? globalMaxFitness : baseScore));
+    //float scaleFactor = (float)(GRAPH_HEIGHT/(globalMaxFitness > baseScore ? globalMaxFitness : baseScore));
+    float scaleFactor = (float)(GRAPH_HEIGHT/globalMaxFitness);
     for (int i = 1; i < localMaxFitness.length; i++) {
     	line(x + dx * (i - 1), GRAPH_HEIGHT - (float)localMaxFitness[i-1] * scaleFactor + GRAPH_Y_START, x + dx * i, GRAPH_HEIGHT - (float)localMaxFitness[i] * scaleFactor + GRAPH_Y_START);
     }
-    stroke(BASE_LINE_RGB[0], BASE_LINE_RGB[1], BASE_LINE_RGB[2]);
-    line(GRAPH_X_START, GRAPH_HEIGHT - baseScore * scaleFactor + GRAPH_Y_START, GRAPH_X_START + GRAPH_WIDTH, GRAPH_HEIGHT - baseScore * scaleFactor + GRAPH_Y_START);
+    //stroke(BASE_LINE_RGB[0], BASE_LINE_RGB[1], BASE_LINE_RGB[2]);
+    //line(GRAPH_X_START, GRAPH_HEIGHT - baseScore * scaleFactor + GRAPH_Y_START, GRAPH_X_START + GRAPH_WIDTH, GRAPH_HEIGHT - baseScore * scaleFactor + GRAPH_Y_START);
     stroke(BORDER_RGB[0], BORDER_RGB[1], BORDER_RGB[2]);
 }
 
@@ -272,6 +273,10 @@ void updateGenInfo(double fitness) {
     if (playersSinceGeneration == POPULATION_SIZE) {
         playersSinceGeneration = 0;
         generation++;
+        trainWorlds.remove(0);
+        World w = new World();
+        w.fillRandom(true);
+        trainWorlds.add(w);
     }
     playersSinceGeneration++;
     if (fitness > globalMaxFitness) {
@@ -703,11 +708,11 @@ class World {
 			obstaclesAdded > 2 ? (r.nextInt(RIGHT_LINE_X - LEFT_LINE_X) + LEFT_LINE_X) : obstaclesAdded == 2 ? (LEFT_LINE_X + RIGHT_LINE_X) / 2.0 : r.nextInt((RIGHT_LINE_X - LEFT_LINE_X - GAP_WIDTH) / 2) + LEFT_LINE_X + ((RIGHT_LINE_X - LEFT_LINE_X - GAP_WIDTH) / 2 + GAP_WIDTH) * r.nextInt(2), 
 			r.nextInt(OBSTACLES_INTERVAL) + i, 
 			r.nextInt(OBSTACLES_SIZE_RANGE) + OBSTACLES_MIN_SIZE));
-			if (obstaclesAdded == GAP_OBSTACLES && trainWorld) {
-    			Obstacle ob = obstacles.get(GAP_OBSTACLES);
-    			baseScore += ob.c.y;
+			//if (obstaclesAdded == GAP_OBSTACLES && trainWorld) {
+    			//Obstacle ob = obstacles.get(GAP_OBSTACLES);
+    			//baseScore += ob.c.y;
     			
-    		}
+    		//}
 		}
 	}
 }
