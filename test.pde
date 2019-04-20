@@ -80,8 +80,12 @@ double[] localMaxFitness;
 int playersSinceGeneration;
 int generation;
 //int baseScore;
+long baseTime;
+long simulationTime;
 
 void setup() {
+    baseTime = System.currentTimeMillis();
+    simulationTime = 0;
 	isRunning = false;
 	localMaxFitness = new double[GENERATIONS_COUNT_MAX * 10];		//TODO: fix
 	worldIndex = 0;
@@ -113,6 +117,8 @@ void setup() {
 	}
 	*/
 	//System.out.println("BASE SCORE: " + baseScore);
+	System.out.println("Total Time: " + (System.currentTimeMillis() - baseTime));
+	System.out.println("Simulation Time: " + simulationTime);
 	isRunning = true;
 }
 
@@ -295,6 +301,7 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
 		double highestScore = 0;
 		double secondHighestScore = 0;
 		double[] scores = new double[TRAIN_WORLDS_SIZE];
+		long simulationBaseTime = System.currentTimeMillis();
     	for (int i = 0; i < trainWorlds.size(); i++) {
 			Player player = new Player(INITIAL_PLAYER_X, INITIAL_PLAYER_Y, radians(INITIAL_PLAYER_ANGLE));
 			player.world = trainWorlds.get(i);
@@ -302,6 +309,7 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
 			RunResults results = runPlayer(player);
 			if (results.turns > MAXIMUM_SIMULATION_TURNS) {
 				//System.out.println("KILLED FOR EXCESS TIME");
+				simulationTime += System.currentTimeMillis() - simulationBaseTime;
 				return 1;    //I do not take kindly to mere machines wasting my valuable time
 			}
 			if (results.turnsGrabbed != 0 && results.turnsNotGrabbed != 0) {
@@ -336,6 +344,7 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
         	netScore = 1;
     	}
 		updateGenInfo(netScore);
+		simulationTime  += System.currentTimeMillis() - simulationBaseTime;
 		return netScore;
 	}
 }
