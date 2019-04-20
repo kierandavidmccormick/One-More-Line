@@ -37,7 +37,7 @@ final int OBSTACLES_SIZE_RANGE = 10;
 final double PLAYER_SPEED = 3.0;
 final double PLAYER_DIAMETER = 6.0;
 final float PLAYER_DEATH_DIAMETER = 20.0;
-static final int TRAIN_WORLDS_SIZE = 10;        //It is recommended not to make this too small
+static final int TRAIN_WORLDS_SIZE = 20;        //It is recommended not to make this too small
 static final int TEST_WORLDS_SIZE = 5 + TRAIN_WORLDS_SIZE;
 final int NEURAL_NET_OBSTACLES_BEFORE = 1;        //number of obstacles with y <= player.c.y given to the nn
 final int NEURAL_NET_OBSTACLES_AFTER = 4;        //number of obstacles with y >= player.c.y given to the nn
@@ -68,7 +68,7 @@ final int[] TREND_LINE_RGB = {0, 0, 255};
 final int[] BORDER_RGB = {0, 0, 0};
 
 final int POPULATION_SIZE = 100;
-final int GENERATIONS_COUNT_MAX = 1000;
+final int GENERATIONS_COUNT_MAX = 200;
 
 final boolean MANUAL_CONTROL = false;
 final boolean NOCLIP = false;
@@ -82,10 +82,22 @@ int generation;
 //int baseScore;
 long baseTime;
 long simulationTime;
+long runTime;
+long moveTime0;
+long moveTime1;
+long moveTime2;
+long networkTime;
+long obstacleTime;
 
 void setup() {
     baseTime = System.currentTimeMillis();
     simulationTime = 0;
+    runTime = 0;
+    moveTime0 = 0;
+    moveTime1 = 0;
+    moveTime2 = 0;
+    obstacleTime = 0;
+    networkTime = 0;
 	isRunning = false;
 	localMaxFitness = new double[GENERATIONS_COUNT_MAX * 10];		//TODO: fix
 	worldIndex = 0;
@@ -119,6 +131,12 @@ void setup() {
 	//System.out.println("BASE SCORE: " + baseScore);
 	System.out.println("Total Time: " + (System.currentTimeMillis() - baseTime));
 	System.out.println("Simulation Time: " + simulationTime);
+	System.out.println("Run time: " + runTime);
+	System.out.println("Move time 0: " + moveTime0);
+	System.out.println("Move time 1: " + moveTime1);
+	System.out.println("Move time 2: " + moveTime2);
+	System.out.println("Network time: " + networkTime);
+	System.out.println("Obstacle time: " + obstacleTime);
 	isRunning = true;
 }
 
@@ -351,6 +369,7 @@ class OMLFitnessFunction extends AbstractFitnessFunction {
 
 //runs a single player forward in time, returning their ultimate y coordinate as a score
 RunResults runPlayer(Player player) {
+    long runTimeBase = System.currentTimeMillis();
 	int turnsTaken = 0;
 	int turnsGrabbed = 0;
 	int turnsIdle = 0;
@@ -364,6 +383,7 @@ RunResults runPlayer(Player player) {
     	}
     	turnsTaken++;
 	}
+	runTime += System.currentTimeMillis() - runTimeBase;
 	return new RunResults(turnsTaken, turnsGrabbed, turnsIdle, player.c.y);
 }
 
@@ -462,8 +482,10 @@ class Player {
 	public MoveResults handleMove(int turnCount) {
 		boolean grabbed = false;        //wheither the player grabs on to anything
 		boolean idle = true;			//wheither the player attempts to grab on to anything
+		long moveTimeBase = System.currentTimeMillis();
 		if (net != null) {
 			setNetworkInput();
+			networkTime += System.currentTimeMillis() - moveTimeBase;
 			if (isRunning && PRINT_NET_OUTPUT) {
 				System.out.println(net.getOutput());
 			}
@@ -473,11 +495,15 @@ class Player {
 			} else {
 				unGrab();
 			}
+			obstacleTime += System.currentTimeMillis() - moveTimeBase;
 		}
+		moveTime0 += System.currentTimeMillis() - moveTimeBase;
 		move();
+		moveTime1 += System.currentTimeMillis() - moveTimeBase;
 		drawPlayer();
 		if ((checkCrash() && !NOCLIP) || c.y > WORLD_LENGTH || turnCount > MAXIMUM_SIMULATION_TURNS) {
 			die();
+			moveTime2 += System.currentTimeMillis() - moveTimeBase;
 			return new MoveResults(grabbed, idle);
 		}
 		if (grabTarget == null) {        //whether the player successfully attempted to grab on to anything
@@ -488,6 +514,7 @@ class Player {
 		if (c.y - gfxOffset > WORLD_SECTION_LENGTH) {
 			resetView(world);
 		}
+		moveTime2 += System.currentTimeMillis() - moveTimeBase;
 		return new MoveResults(grabbed, idle);
 	}
 
@@ -677,6 +704,7 @@ class World {
 	//gets the relevant obstacles for a given coordinate
 	//the obstacle before and the four after the given location
 	//if any of these don't exist, the value at that index will be null
+	//TODO: OPTIMIZE THIS ITS TERRIBLE
 	public ArrayList<Obstacle> getNetObstacles(Coordinate c) {
 		ArrayList<Obstacle> netObs = new ArrayList();
 		//add in valid after objects and before object, valid or not
